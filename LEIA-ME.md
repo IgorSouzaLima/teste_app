@@ -92,6 +92,16 @@ npm start
 
 Abra http://localhost:3000 → faça login com o usuário admin criado acima.
 
+### Deploy do painel admin no Vercel
+
+Crie um projeto novo no Vercel apontando para este mesmo repositório, mas com:
+
+- Root Directory: `entregas-admin`
+- Build Command: `npm run build`
+- Output Directory: `build`
+
+O arquivo `entregas-admin/vercel.json` já faz o rewrite de SPA para rotas como `/login`, `/viagens` e `/clientes`.
+
 ### Deploy do painel admin (para acessar online):
 
 ```bash
@@ -122,6 +132,7 @@ eas build:configure
 ```
 
 Copie o `projectId` gerado e cole em `app.json` → `extra.eas.projectId`.
+O projeto já está preparado para APK de teste Android; o único valor que continua pendente é esse `projectId` real do EAS.
 
 ### Gerar o APK:
 ```bash
@@ -157,6 +168,16 @@ O cliente acessa com o e-mail e senha cadastrados e vê:
 
 Pode ser hospedado no mesmo Firebase Hosting como uma rota separada,
 ou como um projeto React separado apontando para o mesmo banco Firebase.
+
+### Deploy do portal do cliente no Vercel
+
+Crie um segundo projeto no Vercel apontando para este mesmo repositório, mas com:
+
+- Root Directory: `entregas-cliente`
+- Build Command: `npm run build`
+- Output Directory: `build`
+
+O arquivo `entregas-cliente/vercel.json` já faz o rewrite de SPA para rotas como `/login`.
 
 ---
 

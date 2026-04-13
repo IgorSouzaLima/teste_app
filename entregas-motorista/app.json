@@ -4,19 +4,9 @@
     "slug": "entregas-motorista",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#185FA5"
-    },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#185FA5"
-      },
-      "package": "com.suaempresa.entregas",
+      "package": "com.igorsouzalima.entregas",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -25,7 +15,14 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "FOREGROUND_SERVICE",
-        "RECEIVE_BOOT_COMPLETED"
+        "RECEIVE_BOOT_COMPLETED",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "foregroundService": {
         "notificationTitle": "Rastreamento ativo",
@@ -45,12 +42,16 @@
       ],
       [
         "expo-camera",
-        { "cameraPermission": "O app precisa da câmera para fotografar o comprovante de entrega." }
+        {
+          "cameraPermission": "O app precisa da câmera para fotografar o comprovante de entrega."
+        }
       ],
       "expo-task-manager"
     ],
     "extra": {
-      "eas": { "projectId": "SEU_EAS_PROJECT_ID" }
+      "eas": {
+        "projectId": "a8d40471-ca1c-4e52-bb79-0a9b7f2a831d"
+      }
     }
   }
 }
