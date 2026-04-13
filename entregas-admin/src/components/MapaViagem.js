@@ -1,0 +1,82 @@
+// src/components/MapaViagem.js
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { collection, onSnapshot, orderBy, query, doc, onSnapshot as onDocSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Ícones customizados
+const truckIcon = new L.DivIcon({
+  html: `<div style="background:#185FA5;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>`,
+  iconSize: [16, 16], iconAnchor: [8, 8],
+  className: ''
+});
+const destIcon = new L.DivIcon({
+  html: `<div style="background:#E24B4A;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>`,
+  iconSize: [16, 16], iconAnchor: [8, 8],
+  className: ''
+});
+
+function RecenterMap({ pos }) {
+  const map = useMap();
+  useEffect(() => { if (pos) map.setView(pos, map.getZoom()); }, [pos, map]);
+  return null;
+}
+
+export default function MapaViagem({ viagemId }) {
+  const [posicaoAtual, setPosicaoAtual] = useState(null);
+  const [historico, setHistorico] = useState([]);
+  const [viagem, setViagem] = useState(null);
+
+  useEffect(() => {
+    // Dados da viagem
+    const unsubViagem = onDocSnapshot(doc(db, 'viagens', viagemId), snap => {
+      if (snap.exists()) setViagem({ id: snap.id, ...snap.data() });
+    });
+
+    // Histórico de localizações
+    const qLoc = query(
+      collection(db, 'viagens', viagemId, 'localizacoes'),
+      orderBy('timestamp', 'asc')
+    );
+    const unsubLoc = onSnapshot(qLoc, snap => {
+      const locs = snap.docs.map(d => d.data());
+      setHistorico(locs.map(l => [l.lat, l.lng]));
+      if (locs.length > 0) {
+        const ultima = locs[locs.length - 1];
+        setPosicaoAtual([ultima.lat, ultima.lng]);
+      }
+    });
+
+    return () => { unsubViagem(); unsubLoc(); };
+  }, [viagemId]);
+
+  const center = posicaoAtual || [-21.5, -45.4]; // fallback: sul de MG
+
+  return (
+    <div className="map-container">
+      <MapContainer center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap'
+        />
+        {posicaoAtual && (
+          <>
+            <RecenterMap pos={posicaoAtual} />
+            <Marker position={posicaoAtual} icon={truckIcon}>
+              <Popup>
+                <strong>{viagem?.motoristaNome}</strong><br/>
+                {viagem?.motoristaPlaca}<br/>
+                Última atualização GPS
+              </Popup>
+            </Marker>
+          </>
+        )}
+        {historico.length > 1 && (
+          <Polyline positions={historico} color="#185FA5" weight={3} opacity={0.6} />
+        )}
+      </MapContainer>
+    </div>
+  );
+}

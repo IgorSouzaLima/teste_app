@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Entregas",
+    "slug": "entregas-motorista",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#185FA5"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#185FA5"
+      },
+      "package": "com.suaempresa.entregas",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "FOREGROUND_SERVICE",
+        "RECEIVE_BOOT_COMPLETED"
+      ],
+      "foregroundService": {
+        "notificationTitle": "Rastreamento ativo",
+        "notificationBody": "Sua localização está sendo compartilhada",
+        "notificationColor": "#185FA5"
+      }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "O app precisa da sua localização para rastrear a entrega em tempo real.",
+          "locationAlwaysPermission": "O app precisa da localização em segundo plano durante a entrega.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-camera",
+        { "cameraPermission": "O app precisa da câmera para fotografar o comprovante de entrega." }
+      ],
+      "expo-task-manager"
+    ],
+    "extra": {
+      "eas": { "projectId": "SEU_EAS_PROJECT_ID" }
+    }
+  }
+}

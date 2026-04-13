@@ -1,0 +1,19 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Comprovantes: motorista envia, admin e cliente do pedido leem
+    match /comprovantes/{viagemId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024  // max 10 MB
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Fotos de perfil de motoristas
+    match /motoristas/{motoristaId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == motoristaId;
+    }
+  }
+}
