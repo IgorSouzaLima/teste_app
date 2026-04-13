@@ -4,7 +4,7 @@ import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, RefreshControl, ActivityIndicator
 } from 'react-native';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { colors, s } from '../styles';
@@ -23,18 +23,46 @@ export default function HomeScreen({ navigation }) {
   const { motorista, logout } = useAuth();
   const [viagens, setViagens] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    if (!motorista?.id) return;
+    if (!motorista?.id) {
+      setViagens([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError('');
+
     const q = query(
       collection(db, 'viagens'),
-      where('motoristaId', '==', motorista.id),
-      orderBy('criadoEm', 'desc')
+      where('motoristaId', '==', motorista.id)
     );
-    const unsub = onSnapshot(q, snap => {
-      setViagens(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    });
+
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        const docs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const aTs = a.criadoEm?.toMillis?.() || 0;
+            const bTs = b.criadoEm?.toMillis?.() || 0;
+            return bTs - aTs;
+          });
+
+        setViagens(docs);
+        setLoadError('');
+        setLoading(false);
+      },
+      error => {
+        console.warn('Erro ao carregar viagens do motorista:', error);
+        setViagens([]);
+        setLoadError('Nao foi possivel carregar suas cargas agora.');
+        setLoading(false);
+      }
+    );
+
     return unsub;
   }, [motorista]);
 
@@ -111,9 +139,11 @@ export default function HomeScreen({ navigation }) {
         ListEmptyComponent={
           <View style={{ alignItems: 'center', marginTop: 60 }}>
             <Text style={{ fontSize: 32, marginBottom: 12 }}>📦</Text>
-            <Text style={{ fontSize: 15, fontWeight: '500', color: colors.text }}>Nenhuma viagem</Text>
+            <Text style={{ fontSize: 15, fontWeight: '500', color: colors.text }}>
+              {loadError ? 'Erro ao carregar' : 'Nenhuma viagem'}
+            </Text>
             <Text style={{ fontSize: 13, color: colors.text2, marginTop: 4 }}>
-              Aguardando lançamento pelo administrador
+              {loadError || 'Aguardando lançamento pelo administrador'}
             </Text>
           </View>
         }
