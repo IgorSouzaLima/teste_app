@@ -3,19 +3,31 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ── Helpers ────────────────────────────────────────────────
+    function currentUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function currentMotoristaId() {
+      return currentUser().motoristaId;
+    }
+
+    function currentClienteId() {
+      return currentUser().clienteId;
+    }
+
     function isAdmin() {
       return request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        currentUser().role == 'admin';
     }
 
     function isMotorista() {
       return request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'motorista';
+        currentUser().role == 'motorista';
     }
 
     function isCliente() {
       return request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cliente';
+        currentUser().role == 'cliente';
     }
 
     // ── Users ───────────────────────────────────────────────────
@@ -42,32 +54,29 @@ service cloud.firestore {
     // ── Viagens ─────────────────────────────────────────────────
     match /viagens/{viagemId} {
       allow read: if isAdmin() ||
-        (isMotorista() && resource.data.motoristaId == request.auth.uid) ||
-        (isCliente() && resource.data.clienteId ==
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clienteId);
+        (isMotorista() && resource.data.motoristaId == currentMotoristaId()) ||
+        (isCliente() && resource.data.clienteId == currentClienteId());
       allow create: if isAdmin();
       allow update: if isAdmin() ||
-        (isMotorista() && resource.data.motoristaId == request.auth.uid);
+        (isMotorista() && resource.data.motoristaId == currentMotoristaId());
       allow delete: if isAdmin();
     }
 
     // ── Localizações GPS (sub-coleção de viagem) ─────────────────
     match /viagens/{viagemId}/localizacoes/{locId} {
       allow read: if isAdmin() ||
-        (isMotorista() && get(/databases/$(database)/documents/viagens/$(viagemId)).data.motoristaId == request.auth.uid) ||
-        (isCliente() && get(/databases/$(database)/documents/viagens/$(viagemId)).data.clienteId ==
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clienteId);
+        (isMotorista() && get(/databases/$(database)/documents/viagens/$(viagemId)).data.motoristaId == currentMotoristaId()) ||
+        (isCliente() && get(/databases/$(database)/documents/viagens/$(viagemId)).data.clienteId == currentClienteId());
       allow create: if isMotorista() &&
-        get(/databases/$(database)/documents/viagens/$(viagemId)).data.motoristaId == request.auth.uid;
+        get(/databases/$(database)/documents/viagens/$(viagemId)).data.motoristaId == currentMotoristaId();
       allow update, delete: if false;
     }
 
     // ── Comprovantes ─────────────────────────────────────────────
     match /comprovantes/{compId} {
       allow read: if isAdmin() ||
-        (isMotorista() && resource.data.motoristaId == request.auth.uid) ||
-        (isCliente() && resource.data.clienteId ==
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clienteId);
+        (isMotorista() && resource.data.motoristaId == currentMotoristaId()) ||
+        (isCliente() && resource.data.clienteId == currentClienteId());
       allow create: if isMotorista();
       allow update, delete: if isAdmin();
     }
