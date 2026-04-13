@@ -5,6 +5,7 @@
 ```
 /firebase-config/         ← Regras e schema do banco
 /entregas-admin/          ← Painel web (React)
+/entregas-cliente/        ← Portal web do cliente (React)
 /entregas-motorista/      ← App Android (React Native + Expo)
 ```
 
@@ -102,6 +103,9 @@ Crie um projeto novo no Vercel apontando para este mesmo repositório, mas com:
 
 O arquivo `entregas-admin/vercel.json` já faz o rewrite de SPA para rotas como `/login`, `/viagens` e `/clientes`.
 
+URL publicada:
+- https://teste-app-admin.vercel.app
+
 ### Deploy do painel admin (para acessar online):
 
 ```bash
@@ -131,8 +135,10 @@ eas login          # crie conta gratuita em expo.dev se não tiver
 eas build:configure
 ```
 
-Copie o `projectId` gerado e cole em `app.json` → `extra.eas.projectId`.
-O projeto já está preparado para APK de teste Android; o único valor que continua pendente é esse `projectId` real do EAS.
+Este projeto já está vinculado ao EAS:
+- Conta: `igor_lima`
+- Projeto: `@igor_lima/entregas-motorista`
+- `projectId`: `a8d40471-ca1c-4e52-bb79-0a9b7f2a831d`
 
 ### Gerar o APK:
 ```bash
@@ -140,6 +146,9 @@ eas build -p android --profile preview
 ```
 
 O build roda na nuvem (~5-10 min). Ao terminar, você recebe um link para baixar o `.apk`.
+
+Build mais recente:
+- https://expo.dev/accounts/igor_lima/projects/entregas-motorista/builds/545dc410-aa43-4308-bbef-1572d42c1c5d
 
 ### Instalar no celular do motorista:
 1. Baixe o `.apk` no celular
@@ -178,6 +187,9 @@ Crie um segundo projeto no Vercel apontando para este mesmo repositório, mas co
 - Output Directory: `build`
 
 O arquivo `entregas-cliente/vercel.json` já faz o rewrite de SPA para rotas como `/login`.
+
+URL publicada:
+- https://teste-app-cliente.vercel.app
 
 ---
 
