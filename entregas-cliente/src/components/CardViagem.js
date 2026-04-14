@@ -59,7 +59,7 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
   }, [viagemId]);
 
   useEffect(() => {
-    if (!viagemId || viagem?.status !== 'entregue') {
+    if (!viagemId || !viagem?.clienteId || viagem?.status !== 'entregue') {
       setComprovanteColecao(null);
       return;
     }
@@ -67,6 +67,7 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
     const q = query(
       collection(db, 'comprovantes'),
       where('viagemId', '==', viagemId),
+      where('clienteId', '==', viagem.clienteId),
       limit(1)
     );
 
@@ -83,7 +84,7 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
     );
 
     return unsub;
-  }, [viagemId, viagem]);
+  }, [viagemId, viagem?.clienteId, viagem?.status]);
 
   if (!viagem) return null;
 
