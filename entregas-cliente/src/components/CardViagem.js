@@ -1,6 +1,6 @@
 // src/components/CardViagem.js
 import React, { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import MapaAoVivo from './MapaAoVivo';
 import { format } from 'date-fns';
@@ -21,6 +21,7 @@ const statusBadge = {
 
 export default function CardViagem({ viagemId, defaultAberto = false }) {
   const [viagem, setViagem] = useState(null);
+  const [comprovanteColecao, setComprovanteColecao] = useState(null);
   const [aberto, setAberto] = useState(defaultAberto);
 
   const fmtData = (ts) => {
@@ -34,6 +35,24 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
     const unsub = onSnapshot(doc(db, 'viagens', viagemId), snap => {
       if (snap.exists()) setViagem({ id: snap.id, ...snap.data() });
     });
+    return unsub;
+  }, [viagemId]);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'comprovantes'),
+      where('viagemId', '==', viagemId),
+      limit(1)
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        setComprovanteColecao({ id: snap.docs[0].id, ...snap.docs[0].data() });
+      } else {
+        setComprovanteColecao(null);
+      }
+    });
+
     return unsub;
   }, [viagemId]);
 
@@ -52,7 +71,7 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
     fotoUrl: viagem.comprovanteFotoUrl,
   } : null;
 
-  const comprovanteEfetivo = comprovanteDaViagem;
+  const comprovanteEfetivo = comprovanteDaViagem || comprovanteColecao;
 
   const isEmRota = viagem.status === 'em_rota';
   const isEntregue = viagem.status === 'entregue';

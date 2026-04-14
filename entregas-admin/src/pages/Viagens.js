@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   collection, addDoc, onSnapshot, orderBy, query,
-  serverTimestamp, doc, updateDoc, getDocs, where
+  serverTimestamp, doc, updateDoc, getDocs, where, limit
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Layout from '../components/Layout';
@@ -27,6 +27,7 @@ export default function Viagens() {
   const [clientes, setClientes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showDetalhes, setShowDetalhes] = useState(null);
+  const [comprovanteDetalhes, setComprovanteDetalhes] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [filtro, setFiltro] = useState('todos');
@@ -55,6 +56,29 @@ export default function Viagens() {
       setShowDetalhes(atualizada);
     }
   }, [viagens, showDetalhes?.id]);
+
+  useEffect(() => {
+    if (!showDetalhes?.id) {
+      setComprovanteDetalhes(null);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'comprovantes'),
+      where('viagemId', '==', showDetalhes.id),
+      limit(1)
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        setComprovanteDetalhes({ id: snap.docs[0].id, ...snap.docs[0].data(), source: 'collection' });
+      } else {
+        setComprovanteDetalhes(null);
+      }
+    });
+
+    return unsub;
+  }, [showDetalhes?.id]);
 
   const handleMotoristaChange = (id) => {
     const m = motoristas.find(x => x.id === id);
@@ -114,17 +138,21 @@ export default function Viagens() {
   const getComprovanteDaViagem = (viagem) => (
     viagem?.comprovanteFotoUrl ? {
       viagemId: viagem.id,
+      id: `viagem-${viagem.id}`,
       fotoUrl: viagem.comprovanteFotoUrl,
       status: viagem.comprovanteStatus || 'pendente',
       latitude: viagem.comprovanteLatitude ?? null,
       longitude: viagem.comprovanteLongitude ?? null,
       enviadoEm: viagem.comprovanteEnviadoEm || viagem.entregaEm || null,
       motoristaNome: viagem.comprovanteMotoristaNome || viagem.motoristaNome,
+      source: 'viagem',
     } : null
   );
 
+  const getComprovanteEfetivo = (viagem) => getComprovanteDaViagem(viagem) || comprovanteDetalhes;
+
   const confirmarComprovante = async (viagem) => {
-    const comprovante = getComprovanteDaViagem(viagem);
+    const comprovante = getComprovanteEfetivo(viagem);
     if (!comprovante) return;
 
     await updateDoc(doc(db, 'viagens', viagem.id), { comprovanteStatus: 'confirmado' });
@@ -304,7 +332,7 @@ export default function Viagens() {
             </div>
             <div className="modal-body">
               {(() => {
-                const comprovante = getComprovanteDaViagem(showDetalhes);
+                const comprovante = getComprovanteEfetivo(showDetalhes);
                 return (
                   <>
               <div className="form-grid-2" style={{ marginBottom: 16 }}>
