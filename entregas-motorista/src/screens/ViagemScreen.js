@@ -13,6 +13,68 @@ import { useAuth } from '../lib/AuthContext';
 import { iniciarRastreamento, pararRastreamento } from '../lib/gpsTask';
 import { colors, s } from '../styles';
 
+function normalizarFotoSelecionada(asset) {
+  if (!asset?.uri) return null;
+
+  const mimeType = asset.mimeType?.startsWith('image/')
+    ? asset.mimeType
+    : 'image/jpeg';
+
+  const extByName = asset.fileName?.split('.').pop()?.toLowerCase();
+  const extByMime = mimeType.split('/')[1]?.toLowerCase();
+
+  return {
+    ...asset,
+    fileName: asset.fileName || `comprovante.${extByName || extByMime || 'jpg'}`,
+    mimeType,
+  };
+}
+
+function getFotoExtensao(asset) {
+  const extByName = asset?.fileName?.split('.').pop()?.toLowerCase();
+  if (extByName) return extByName;
+
+  const extByMime = asset?.mimeType?.split('/')[1]?.toLowerCase();
+  if (extByMime) return extByMime;
+
+  return 'jpg';
+}
+
+function carregarBlobDaUri(uri) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => resolve(xhr.response);
+    xhr.onerror = () => reject(new Error('Nao foi possivel ler a imagem selecionada.'));
+    xhr.responseType = 'blob';
+    xhr.open('GET', uri, true);
+    xhr.send(null);
+  });
+}
+
+function formatarErroUpload(error) {
+  if (error?.code === 'storage/unauthorized') {
+    return 'Sem permissao para enviar comprovantes no Firebase Storage.';
+  }
+
+  if (error?.code === 'storage/canceled') {
+    return 'O envio do comprovante foi cancelado.';
+  }
+
+  if (error?.code === 'storage/retry-limit-exceeded') {
+    return 'A conexao caiu durante o envio. Tente novamente.';
+  }
+
+  if (error?.code === 'storage/unknown') {
+    return 'O Firebase Storage deste projeto ainda nao esta pronto para receber comprovantes.';
+  }
+
+  if (error?.message) {
+    return error.message;
+  }
+
+  return 'Nao foi possivel enviar o comprovante agora.';
+}
+
 export default function ViagemScreen({ route, navigation }) {
   const { viagem: viagemInicial } = route.params;
   const { motorista } = useAuth();
@@ -21,7 +83,7 @@ export default function ViagemScreen({ route, navigation }) {
   const [posicaoAtual, setPosicaoAtual] = useState(null);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null);
   const [trackingError, setTrackingError] = useState('');
-  const [fotoUri, setFotoUri] = useState(null);
+  const [fotoSelecionada, setFotoSelecionada] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const scrollRef = useRef(null);
@@ -133,7 +195,7 @@ export default function ViagemScreen({ route, navigation }) {
       quality: 0.75,
       allowsEditing: false,
     });
-    if (!result.canceled) setFotoUri(result.assets[0].uri);
+    if (!result.canceled) setFotoSelecionada(normalizarFotoSelecionada(result.assets[0]));
   };
 
   const abrirGaleria = async () => {
@@ -141,11 +203,11 @@ export default function ViagemScreen({ route, navigation }) {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.75,
     });
-    if (!result.canceled) setFotoUri(result.assets[0].uri);
+    if (!result.canceled) setFotoSelecionada(normalizarFotoSelecionada(result.assets[0]));
   };
 
   const confirmarEntrega = async () => {
-    if (!fotoUri) { Alert.alert('Foto obrigatória', 'Tire ou selecione a foto do comprovante.'); return; }
+    if (!fotoSelecionada?.uri) { Alert.alert('Foto obrigatória', 'Tire ou selecione a foto do comprovante.'); return; }
 
     Alert.alert(
       'Confirmar entrega',
@@ -166,19 +228,37 @@ export default function ViagemScreen({ route, navigation }) {
               } catch (_) {}
 
               // Upload da foto
-              const response = await fetch(fotoUri);
-              const blob = await response.blob();
-              const storagePath = `comprovantes/${viagem.id}/${Date.now()}.jpg`;
+              const blob = await carregarBlobDaUri(fotoSelecionada.uri);
+              const storageExt = getFotoExtensao(fotoSelecionada);
+              const storagePath = `comprovantes/${viagem.id}/${Date.now()}.${storageExt}`;
               const storageRef = ref(storage, storagePath);
 
-              await new Promise((resolve, reject) => {
-                const task = uploadBytesResumable(storageRef, blob);
-                task.on('state_changed',
-                  snap => setUploadProgress(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
-                  reject,
-                  resolve
-                );
-              });
+              try {
+                await new Promise((resolve, reject) => {
+                  const task = uploadBytesResumable(
+                    storageRef,
+                    blob,
+                    {
+                      contentType: fotoSelecionada.mimeType || 'image/jpeg',
+                      customMetadata: {
+                        viagemId: viagem.id,
+                        motoristaId: motorista.id,
+                      },
+                    }
+                  );
+
+                  task.on(
+                    'state_changed',
+                    snap => setUploadProgress(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
+                    reject,
+                    resolve
+                  );
+                });
+              } finally {
+                if (typeof blob?.close === 'function') {
+                  blob.close();
+                }
+              }
 
               const fotoUrl = await getDownloadURL(storageRef);
 
@@ -213,7 +293,7 @@ export default function ViagemScreen({ route, navigation }) {
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
               );
             } catch (e) {
-              Alert.alert('Erro', 'Falha ao enviar comprovante: ' + e.message);
+              Alert.alert('Erro', `Falha ao enviar comprovante: ${formatarErroUpload(e)}`);
             } finally {
               setUploading(false);
               setUploadProgress(0);
@@ -370,7 +450,7 @@ export default function ViagemScreen({ route, navigation }) {
             Ao chegar no destino, fotografe o comprovante assinado pelo cliente.
           </Text>
 
-          {!fotoUri ? (
+          {!fotoSelecionada?.uri ? (
             <TouchableOpacity style={s.uploadArea} onPress={escolherFoto}>
               <Text style={{ fontSize: 28 }}>📷</Text>
               <Text style={s.uploadTitle}>Fotografar comprovante</Text>
@@ -378,10 +458,10 @@ export default function ViagemScreen({ route, navigation }) {
             </TouchableOpacity>
           ) : (
             <View style={{ marginTop: 10 }}>
-              <Image source={{ uri: fotoUri }} style={{ width: '100%', height: 200, borderRadius: 8 }} />
+              <Image source={{ uri: fotoSelecionada.uri }} style={{ width: '100%', height: 200, borderRadius: 8 }} />
               <TouchableOpacity
                 style={{ marginTop: 8, alignItems: 'center' }}
-                onPress={() => setFotoUri(null)}
+                onPress={() => setFotoSelecionada(null)}
               >
                 <Text style={{ color: colors.danger, fontSize: 13 }}>Tirar outra foto</Text>
               </TouchableOpacity>
@@ -397,7 +477,7 @@ export default function ViagemScreen({ route, navigation }) {
             </View>
           )}
 
-          {fotoUri && !uploading && (
+          {fotoSelecionada?.uri && !uploading && (
             <TouchableOpacity
               style={[s.btn, s.btnSuccess, { marginTop: 14 }]}
               onPress={confirmarEntrega}

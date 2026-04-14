@@ -57,7 +57,7 @@ export default function PerfilScreen() {
             GPS em segundo plano
           </Text>
           <Text style={{ fontSize: 12, color: colors.primaryText, lineHeight: 18 }}>
-            Durante uma viagem ativa, sua localização é enviada automaticamente a cada 10 segundos,
+            Durante uma viagem ativa, sua localização é enviada automaticamente a cada 1 minuto,
             mesmo com o app em segundo plano. O rastreamento para automaticamente ao confirmar a entrega.
           </Text>
         </View>

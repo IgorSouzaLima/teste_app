@@ -136,7 +136,7 @@ export default function MapaAoVivo({ viagemId, motoristaNome }) {
       {posicaoAtual ? (
         <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6, textAlign: 'center' }}>
           <span className="live-dot" />
-          Posição atualizada às {fmtHora(atualizadoEm)} · atualiza a cada 10 segundos
+          Posição atualizada às {fmtHora(atualizadoEm)} · atualiza a cada 1 minuto
         </p>
       ) : (
         <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6, textAlign: 'center' }}>

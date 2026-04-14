@@ -72,7 +72,7 @@ export async function iniciarRastreamento(viagemId, motoristaId) {
   _locationSubscription = await Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.Balanced,
-      timeInterval: 10000,
+      timeInterval: 60000,
       distanceInterval: 20,
     },
     async (location) => {
