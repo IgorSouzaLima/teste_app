@@ -1,6 +1,6 @@
 // src/components/CardViagem.js
 import React, { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import MapaAoVivo from './MapaAoVivo';
 import { format } from 'date-fns';
@@ -19,27 +19,7 @@ const statusBadge = {
   cancelada: 'badge badge-warning',
 };
 
-const normalizarNotas = (notas) => {
-  if (Array.isArray(notas)) return notas.map((item) => String(item).trim()).filter(Boolean);
-  if (typeof notas === 'string') return notas.split(',').map((item) => item.trim()).filter(Boolean);
-  return [];
-};
-
 const getFotoUrl = (item) => item?.fotoUrl || item?.comprovanteFotoUrl || item?.secure_url || item?.url || null;
-
-const getTimestampMs = (value) => {
-  if (!value) return 0;
-  if (typeof value?.toMillis === 'function') return value.toMillis();
-  const date = value?.toDate ? value.toDate() : new Date(value);
-  return Number.isNaN(date?.getTime?.()) ? 0 : date.getTime();
-};
-
-const hasMesmasNotas = (viagem, comprovante) => {
-  const notasViagem = normalizarNotas(viagem?.notas);
-  const notasComprovante = normalizarNotas(comprovante?.notas);
-  if (!notasViagem.length || !notasComprovante.length) return false;
-  return notasViagem.every((nota) => notasComprovante.includes(nota));
-};
 
 const normalizarComprovanteDaColecao = (viagem, item) => {
   const fotoUrl = getFotoUrl(item);
@@ -59,32 +39,9 @@ const normalizarComprovanteDaColecao = (viagem, item) => {
   };
 };
 
-const encontrarComprovanteDaColecao = (viagem, comprovantes) => {
-  if (!viagem || !comprovantes.length) return null;
-
-  const candidato = [...comprovantes]
-    .filter((item) => {
-      if (!getFotoUrl(item)) return false;
-      if (item.viagemId && item.viagemId === viagem.id) return true;
-
-      const mesmoClienteId = item.clienteId && viagem.clienteId && item.clienteId === viagem.clienteId;
-      const mesmoClienteNome = item.clienteNome && viagem.clienteNome && item.clienteNome === viagem.clienteNome;
-      const mesmoMotoristaId = item.motoristaId && viagem.motoristaId && item.motoristaId === viagem.motoristaId;
-      const mesmoMotoristaNome = item.motoristaNome && viagem.motoristaNome && item.motoristaNome === viagem.motoristaNome;
-
-      return (mesmoClienteId || mesmoClienteNome) && (hasMesmasNotas(viagem, item) || mesmoMotoristaId || mesmoMotoristaNome);
-    })
-    .sort((a, b) => {
-      const aMs = getTimestampMs(a.criadoEm || a.enviadoEm || a.comprovanteEnviadoEm);
-      const bMs = getTimestampMs(b.criadoEm || b.enviadoEm || b.comprovanteEnviadoEm);
-      return bMs - aMs;
-    })[0];
-
-  return candidato ? normalizarComprovanteDaColecao(viagem, candidato) : null;
-};
-
-export default function CardViagem({ viagemId, comprovantesCliente = [], defaultAberto = false }) {
+export default function CardViagem({ viagemId, defaultAberto = false }) {
   const [viagem, setViagem] = useState(null);
+  const [comprovanteColecao, setComprovanteColecao] = useState(null);
   const [aberto, setAberto] = useState(defaultAberto);
 
   const fmtData = (ts) => {
@@ -101,9 +58,36 @@ export default function CardViagem({ viagemId, comprovantesCliente = [], default
     return unsub;
   }, [viagemId]);
 
+  useEffect(() => {
+    if (!viagemId || viagem?.status !== 'entregue') {
+      setComprovanteColecao(null);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'comprovantes'),
+      where('viagemId', '==', viagemId),
+      limit(1)
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        if (!snap.empty && viagem) {
+          setComprovanteColecao(normalizarComprovanteDaColecao(viagem, { id: snap.docs[0].id, ...snap.docs[0].data() }));
+        } else {
+          setComprovanteColecao(null);
+        }
+      },
+      () => setComprovanteColecao(null)
+    );
+
+    return unsub;
+  }, [viagemId, viagem]);
+
   if (!viagem) return null;
 
-  const comprovanteDaViagem = getFotoUrl(viagem) ? {
+  const comprovanteDaViagem = viagem.status === 'entregue' && getFotoUrl(viagem) ? {
     id: `viagem-${viagem.id}`,
     viagemId: viagem.id,
     clienteNome: viagem.clienteNome,
@@ -116,7 +100,7 @@ export default function CardViagem({ viagemId, comprovantesCliente = [], default
     fotoUrl: getFotoUrl(viagem),
   } : null;
 
-  const comprovanteEfetivo = comprovanteDaViagem || encontrarComprovanteDaColecao(viagem, comprovantesCliente);
+  const comprovanteEfetivo = comprovanteDaViagem || comprovanteColecao;
 
   const isEmRota = viagem.status === 'em_rota';
   const isEntregue = viagem.status === 'entregue';
