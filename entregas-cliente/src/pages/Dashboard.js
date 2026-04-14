@@ -10,6 +10,7 @@ import CardViagem from '../components/CardViagem';
 export default function Dashboard() {
   const { clienteData, logout } = useAuth();
   const [viagens, setViagens] = useState([]);
+  const [comprovantes, setComprovantes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [aba, setAba] = useState('ativas');
@@ -53,6 +54,26 @@ export default function Dashboard() {
 
     return unsub;
   }, [clienteData]);
+
+  useEffect(() => {
+    if (!clienteData?.id) {
+      setComprovantes([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'comprovantes'),
+      where('clienteId', '==', clienteData.id)
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => setComprovantes(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))),
+      () => setComprovantes([])
+    );
+
+    return unsub;
+  }, [clienteData?.id]);
 
   const ativas = viagens.filter(v => v.status === 'agendada' || v.status === 'em_rota');
   const historico = viagens.filter(v => v.status === 'entregue' || v.status === 'cancelada');
@@ -135,6 +156,7 @@ export default function Dashboard() {
           <CardViagem
             key={v.id}
             viagemId={v.id}
+            comprovantesCliente={comprovantes}
             defaultAberto={i === 0 && v.status === 'em_rota'}
           />
         ))}

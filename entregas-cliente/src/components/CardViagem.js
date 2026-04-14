@@ -1,6 +1,6 @@
 // src/components/CardViagem.js
 import React, { useEffect, useState } from 'react';
-import { collection, doc, limit, onSnapshot, query, where } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import MapaAoVivo from './MapaAoVivo';
 import { format } from 'date-fns';
@@ -19,9 +19,72 @@ const statusBadge = {
   cancelada: 'badge badge-warning',
 };
 
-export default function CardViagem({ viagemId, defaultAberto = false }) {
+const normalizarNotas = (notas) => {
+  if (Array.isArray(notas)) return notas.map((item) => String(item).trim()).filter(Boolean);
+  if (typeof notas === 'string') return notas.split(',').map((item) => item.trim()).filter(Boolean);
+  return [];
+};
+
+const getFotoUrl = (item) => item?.fotoUrl || item?.comprovanteFotoUrl || item?.secure_url || item?.url || null;
+
+const getTimestampMs = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  return Number.isNaN(date?.getTime?.()) ? 0 : date.getTime();
+};
+
+const hasMesmasNotas = (viagem, comprovante) => {
+  const notasViagem = normalizarNotas(viagem?.notas);
+  const notasComprovante = normalizarNotas(comprovante?.notas);
+  if (!notasViagem.length || !notasComprovante.length) return false;
+  return notasViagem.every((nota) => notasComprovante.includes(nota));
+};
+
+const normalizarComprovanteDaColecao = (viagem, item) => {
+  const fotoUrl = getFotoUrl(item);
+  if (!fotoUrl) return null;
+
+  return {
+    id: item.id,
+    viagemId: item.viagemId || viagem.id,
+    clienteNome: item.clienteNome || viagem.clienteNome,
+    motoristaNome: item.motoristaNome || item.comprovanteMotoristaNome || viagem.motoristaNome,
+    notas: item.notas || viagem.notas || [],
+    latitude: item.latitude ?? item.comprovanteLatitude ?? null,
+    longitude: item.longitude ?? item.comprovanteLongitude ?? null,
+    criadoEm: item.criadoEm || item.enviadoEm || item.comprovanteEnviadoEm || null,
+    status: item.status || item.comprovanteStatus || 'pendente',
+    fotoUrl,
+  };
+};
+
+const encontrarComprovanteDaColecao = (viagem, comprovantes) => {
+  if (!viagem || !comprovantes.length) return null;
+
+  const candidato = [...comprovantes]
+    .filter((item) => {
+      if (!getFotoUrl(item)) return false;
+      if (item.viagemId && item.viagemId === viagem.id) return true;
+
+      const mesmoClienteId = item.clienteId && viagem.clienteId && item.clienteId === viagem.clienteId;
+      const mesmoClienteNome = item.clienteNome && viagem.clienteNome && item.clienteNome === viagem.clienteNome;
+      const mesmoMotoristaId = item.motoristaId && viagem.motoristaId && item.motoristaId === viagem.motoristaId;
+      const mesmoMotoristaNome = item.motoristaNome && viagem.motoristaNome && item.motoristaNome === viagem.motoristaNome;
+
+      return (mesmoClienteId || mesmoClienteNome) && (hasMesmasNotas(viagem, item) || mesmoMotoristaId || mesmoMotoristaNome);
+    })
+    .sort((a, b) => {
+      const aMs = getTimestampMs(a.criadoEm || a.enviadoEm || a.comprovanteEnviadoEm);
+      const bMs = getTimestampMs(b.criadoEm || b.enviadoEm || b.comprovanteEnviadoEm);
+      return bMs - aMs;
+    })[0];
+
+  return candidato ? normalizarComprovanteDaColecao(viagem, candidato) : null;
+};
+
+export default function CardViagem({ viagemId, comprovantesCliente = [], defaultAberto = false }) {
   const [viagem, setViagem] = useState(null);
-  const [comprovanteColecao, setComprovanteColecao] = useState(null);
   const [aberto, setAberto] = useState(defaultAberto);
 
   const fmtData = (ts) => {
@@ -38,27 +101,9 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
     return unsub;
   }, [viagemId]);
 
-  useEffect(() => {
-    const q = query(
-      collection(db, 'comprovantes'),
-      where('viagemId', '==', viagemId),
-      limit(1)
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      if (!snap.empty) {
-        setComprovanteColecao({ id: snap.docs[0].id, ...snap.docs[0].data() });
-      } else {
-        setComprovanteColecao(null);
-      }
-    });
-
-    return unsub;
-  }, [viagemId]);
-
   if (!viagem) return null;
 
-  const comprovanteDaViagem = viagem.comprovanteFotoUrl ? {
+  const comprovanteDaViagem = getFotoUrl(viagem) ? {
     id: `viagem-${viagem.id}`,
     viagemId: viagem.id,
     clienteNome: viagem.clienteNome,
@@ -68,10 +113,10 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
     longitude: viagem.comprovanteLongitude ?? null,
     criadoEm: viagem.comprovanteEnviadoEm || viagem.entregaEm || null,
     status: viagem.comprovanteStatus || 'pendente',
-    fotoUrl: viagem.comprovanteFotoUrl,
+    fotoUrl: getFotoUrl(viagem),
   } : null;
 
-  const comprovanteEfetivo = comprovanteDaViagem || comprovanteColecao;
+  const comprovanteEfetivo = comprovanteDaViagem || encontrarComprovanteDaColecao(viagem, comprovantesCliente);
 
   const isEmRota = viagem.status === 'em_rota';
   const isEntregue = viagem.status === 'entregue';
