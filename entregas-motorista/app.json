@@ -58,6 +58,10 @@
       "expo-task-manager"
     ],
     "extra": {
+      "cloudinary": {
+        "cloudName": "SEU_CLOUD_NAME",
+        "uploadPreset": "SEU_UPLOAD_PRESET"
+      },
       "eas": {
         "projectId": "a8d40471-ca1c-4e52-bb79-0a9b7f2a831d"
       }

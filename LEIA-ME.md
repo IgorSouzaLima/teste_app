@@ -28,10 +28,6 @@
 - Escolha "Iniciar no modo de produção"
 - Selecione a região: `southamerica-east1` (São Paulo)
 
-**Storage:**
-- Menu lateral → Storage → Primeiros passos
-- Aceite as regras padrão (vamos substituir depois)
-
 ---
 
 ## PASSO 2 — Aplicar as regras de segurança
@@ -39,11 +35,6 @@
 **Firestore Rules:**
 - Menu lateral → Firestore → Aba "Regras"
 - Cole o conteúdo de `firebase-config/firestore.rules`
-- Clique em Publicar
-
-**Storage Rules:**
-- Menu lateral → Storage → Aba "Regras"
-- Cole o conteúdo de `firebase-config/storage.rules`
 - Clique em Publicar
 
 **Indexes:**
@@ -155,6 +146,25 @@ Build mais recente:
 2. Nas configurações do Android: ative "Fontes desconhecidas" (ou "Instalar apps de outras fontes")
 3. Abra o arquivo `.apk` e instale
 
+### Configurar o Cloudinary para comprovantes
+
+Este projeto usa Firebase para login e banco, mas usa `Cloudinary` para armazenar as fotos dos comprovantes sem depender do Firebase Storage.
+
+1. Crie uma conta gratuita em https://cloudinary.com
+2. No painel, copie o `Cloud name`
+3. Vá em `Settings` → `Upload`
+4. Crie um `Upload preset` com modo `Unsigned`
+5. Edite [entregas-motorista/app.json](/Users/igor/Downloads/codex/primeiro app/files/entregas-motorista/app.json) e preencha:
+
+```json
+"cloudinary": {
+  "cloudName": "SEU_CLOUD_NAME",
+  "uploadPreset": "SEU_UPLOAD_PRESET"
+}
+```
+
+6. Gere um novo APK depois dessa configuração
+
 ---
 
 ## PASSO 7 — Cadastrar motoristas e clientes
@@ -206,7 +216,7 @@ URL publicada:
       ↓
 5. Motorista chega no destino → fotografa comprovante
       ↓
-6. App envia foto ao Firebase Storage
+6. App envia foto ao Cloudinary
       ↓
 7. Admin vê comprovante na aba "Comprovantes" e confirma
 8. Cliente vê comprovante automaticamente no portal

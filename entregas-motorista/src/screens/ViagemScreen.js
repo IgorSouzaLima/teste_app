@@ -7,9 +7,9 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
+import { uploadComprovanteParaCloudinary } from '../lib/cloudinary';
 import { iniciarRastreamento, pararRastreamento } from '../lib/gpsTask';
 import { colors, s } from '../styles';
 
@@ -30,44 +30,7 @@ function normalizarFotoSelecionada(asset) {
   };
 }
 
-function getFotoExtensao(asset) {
-  const extByName = asset?.fileName?.split('.').pop()?.toLowerCase();
-  if (extByName) return extByName;
-
-  const extByMime = asset?.mimeType?.split('/')[1]?.toLowerCase();
-  if (extByMime) return extByMime;
-
-  return 'jpg';
-}
-
-function carregarBlobDaUri(uri) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.onload = () => resolve(xhr.response);
-    xhr.onerror = () => reject(new Error('Nao foi possivel ler a imagem selecionada.'));
-    xhr.responseType = 'blob';
-    xhr.open('GET', uri, true);
-    xhr.send(null);
-  });
-}
-
 function formatarErroUpload(error) {
-  if (error?.code === 'storage/unauthorized') {
-    return 'Sem permissao para enviar comprovantes no Firebase Storage.';
-  }
-
-  if (error?.code === 'storage/canceled') {
-    return 'O envio do comprovante foi cancelado.';
-  }
-
-  if (error?.code === 'storage/retry-limit-exceeded') {
-    return 'A conexao caiu durante o envio. Tente novamente.';
-  }
-
-  if (error?.code === 'storage/unknown') {
-    return 'O Firebase Storage deste projeto ainda nao esta pronto para receber comprovantes.';
-  }
-
   if (error?.message) {
     return error.message;
   }
@@ -227,40 +190,9 @@ export default function ViagemScreen({ route, navigation }) {
                 lng = loc.coords.longitude;
               } catch (_) {}
 
-              // Upload da foto
-              const blob = await carregarBlobDaUri(fotoSelecionada.uri);
-              const storageExt = getFotoExtensao(fotoSelecionada);
-              const storagePath = `comprovantes/${viagem.id}/${Date.now()}.${storageExt}`;
-              const storageRef = ref(storage, storagePath);
-
-              try {
-                await new Promise((resolve, reject) => {
-                  const task = uploadBytesResumable(
-                    storageRef,
-                    blob,
-                    {
-                      contentType: fotoSelecionada.mimeType || 'image/jpeg',
-                      customMetadata: {
-                        viagemId: viagem.id,
-                        motoristaId: motorista.id,
-                      },
-                    }
-                  );
-
-                  task.on(
-                    'state_changed',
-                    snap => setUploadProgress(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
-                    reject,
-                    resolve
-                  );
-                });
-              } finally {
-                if (typeof blob?.close === 'function') {
-                  blob.close();
-                }
-              }
-
-              const fotoUrl = await getDownloadURL(storageRef);
+              setUploadProgress(25);
+              const upload = await uploadComprovanteParaCloudinary(fotoSelecionada, viagem.id);
+              setUploadProgress(85);
 
               // Salvar comprovante
               await addDoc(collection(db, 'comprovantes'), {
@@ -270,13 +202,20 @@ export default function ViagemScreen({ route, navigation }) {
                 clienteId: viagem.clienteId,
                 clienteNome: viagem.clienteNome,
                 notas: viagem.notas,
-                fotoUrl,
-                fotoPath: storagePath,
+                fotoUrl: upload.fotoUrl,
+                fotoPath: upload.fotoPublicId,
+                fotoProvider: 'cloudinary',
+                fotoPublicId: upload.fotoPublicId,
+                fotoBytes: upload.bytes,
+                fotoFormat: upload.format,
+                fotoWidth: upload.width,
+                fotoHeight: upload.height,
                 latitude: lat,
                 longitude: lng,
                 criadoEm: serverTimestamp(),
                 status: 'pendente',
               });
+              setUploadProgress(100);
 
               // Atualizar viagem como entregue
               await updateDoc(doc(db, 'viagens', viagem.id), {
