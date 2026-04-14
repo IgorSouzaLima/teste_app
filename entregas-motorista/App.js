@@ -2,7 +2,7 @@
 import 'expo-task-manager';
 import './src/lib/gpsTask'; // registra a task GPS antes de qualquer render
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,6 +15,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import ViagemScreen from './src/screens/ViagemScreen';
 import PerfilScreen from './src/screens/PerfilScreen';
 import { colors } from './src/styles';
+import { limparRastreamentoLegado } from './src/lib/gpsTask';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -80,6 +81,10 @@ function AppNavigator() {
 }
 
 export default function App() {
+  useEffect(() => {
+    limparRastreamentoLegado().catch(() => {});
+  }, []);
+
   return (
     <AuthProvider>
       <AppNavigator />
