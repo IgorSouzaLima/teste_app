@@ -1,6 +1,6 @@
 // src/pages/Comprovantes.js
 import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, orderBy, query, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, doc, updateDoc, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Layout from '../components/Layout';
 import { format } from 'date-fns';
@@ -10,12 +10,75 @@ import toast from 'react-hot-toast';
 export default function Comprovantes() {
   const [comprovantes, setComprovantes] = useState([]);
   const [fotoAberta, setFotoAberta] = useState(null);
+  const [erro, setErro] = useState('');
 
   useEffect(() => {
-    const q = query(collection(db, 'comprovantes'), orderBy('criadoEm', 'desc'));
-    return onSnapshot(q, snap => {
-      setComprovantes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const mergeComprovantes = (viagensDocs, comprovanteDocs) => {
+      const merged = new Map();
+
+      comprovanteDocs.forEach((item) => {
+        const key = item.viagemId || item.id;
+        merged.set(key, item);
+      });
+
+      viagensDocs.forEach((item) => {
+        const key = item.viagemId || item.id;
+        merged.set(key, item);
+      });
+
+      return Array.from(merged.values()).sort((a, b) => {
+        const aMs = a.criadoEm?.toMillis?.() || 0;
+        const bMs = b.criadoEm?.toMillis?.() || 0;
+        return bMs - aMs;
+      });
+    };
+
+    let viagensState = [];
+    let comprovantesState = [];
+
+    const viagensQuery = query(collection(db, 'viagens'), orderBy('entregaEm', 'desc'));
+    const unsubViagens = onSnapshot(
+      viagensQuery,
+      (snap) => {
+        viagensState = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((v) => !!v.comprovanteFotoUrl)
+          .map((v) => ({
+            id: `viagem-${v.id}`,
+            viagemId: v.id,
+            motoristaNome: v.comprovanteMotoristaNome || v.motoristaNome,
+            clienteNome: v.clienteNome,
+            notas: v.notas || [],
+            latitude: v.comprovanteLatitude ?? null,
+            longitude: v.comprovanteLongitude ?? null,
+            status: v.comprovanteStatus || 'pendente',
+            fotoUrl: v.comprovanteFotoUrl,
+            fotoPath: v.comprovantePublicId || null,
+            criadoEm: v.comprovanteEnviadoEm || v.entregaEm || null,
+            source: 'viagem',
+          }));
+
+        setComprovantes(mergeComprovantes(viagensState, comprovantesState));
+        setErro('');
+      },
+      () => setErro('Nao foi possivel carregar os comprovantes das viagens.')
+    );
+
+    const comprovantesQuery = query(collection(db, 'comprovantes'), orderBy('criadoEm', 'desc'));
+    const unsubComprovantes = onSnapshot(
+      comprovantesQuery,
+      (snap) => {
+        comprovantesState = snap.docs.map((d) => ({ id: d.id, ...d.data(), source: 'collection' }));
+        setComprovantes(mergeComprovantes(viagensState, comprovantesState));
+        setErro('');
+      },
+      () => setErro('Nao foi possivel carregar a colecao de comprovantes.')
+    );
+
+    return () => {
+      unsubViagens();
+      unsubComprovantes();
+    };
   }, []);
 
   const fmtData = (ts) => {
@@ -24,14 +87,27 @@ export default function Comprovantes() {
     return format(d, "dd/MM/yyyy HH:mm", { locale: ptBR });
   };
 
-  const confirmar = async (id) => {
-    await updateDoc(doc(db, 'comprovantes', id), { status: 'confirmado' });
+  const confirmar = async (item) => {
+    if (item.viagemId) {
+      await updateDoc(doc(db, 'viagens', item.viagemId), { comprovanteStatus: 'confirmado' });
+    }
+
+    if (item.source === 'collection') {
+      await updateDoc(doc(db, 'comprovantes', item.id), { status: 'confirmado' });
+    } else if (item.viagemId) {
+      const related = await getDocs(query(collection(db, 'comprovantes'), where('viagemId', '==', item.viagemId)));
+      await Promise.all(related.docs.map((snap) => updateDoc(doc(db, 'comprovantes', snap.id), { status: 'confirmado' })));
+    }
+
     toast.success('Comprovante confirmado');
   };
 
   return (
     <Layout title="Comprovantes de entrega">
       <div className="card" style={{ marginBottom: 0 }}>
+        {erro && (
+          <div style={{ padding: 16, color: 'var(--danger)' }}>{erro}</div>
+        )}
         <div className="table-wrap">
           <table>
             <thead>
@@ -87,7 +163,7 @@ export default function Comprovantes() {
                   </td>
                   <td>
                     {c.status !== 'confirmado' && (
-                      <button className="btn btn-sm btn-success" onClick={() => confirmar(c.id)}>
+                      <button className="btn btn-sm btn-success" onClick={() => confirmar(c)}>
                         Confirmar
                       </button>
                     )}
@@ -146,7 +222,7 @@ export default function Comprovantes() {
             </div>
             <div className="modal-footer">
               {fotoAberta.status !== 'confirmado' && (
-                <button className="btn btn-success" onClick={() => { confirmar(fotoAberta.id); setFotoAberta(null); }}>
+                <button className="btn btn-success" onClick={() => { confirmar(fotoAberta); setFotoAberta(null); }}>
                   Confirmar entrega
                 </button>
               )}

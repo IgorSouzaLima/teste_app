@@ -193,6 +193,7 @@ export default function ViagemScreen({ route, navigation }) {
               setUploadProgress(25);
               const upload = await uploadComprovanteParaCloudinary(fotoSelecionada, viagem.id);
               setUploadProgress(85);
+              const comprovanteTimestamp = serverTimestamp();
 
               // Salvar comprovante
               await addDoc(collection(db, 'comprovantes'), {
@@ -212,7 +213,7 @@ export default function ViagemScreen({ route, navigation }) {
                 fotoHeight: upload.height,
                 latitude: lat,
                 longitude: lng,
-                criadoEm: serverTimestamp(),
+                criadoEm: comprovanteTimestamp,
                 status: 'pendente',
               });
               setUploadProgress(100);
@@ -221,6 +222,14 @@ export default function ViagemScreen({ route, navigation }) {
               await updateDoc(doc(db, 'viagens', viagem.id), {
                 status: 'entregue',
                 entregaEm: serverTimestamp(),
+                comprovanteFotoUrl: upload.fotoUrl,
+                comprovanteProvider: 'cloudinary',
+                comprovantePublicId: upload.fotoPublicId,
+                comprovanteStatus: 'pendente',
+                comprovanteLatitude: lat,
+                comprovanteLongitude: lng,
+                comprovanteEnviadoEm: comprovanteTimestamp,
+                comprovanteMotoristaNome: motorista.nome,
               });
 
               // Parar GPS

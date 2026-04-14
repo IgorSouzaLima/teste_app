@@ -57,6 +57,21 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
 
   if (!viagem) return null;
 
+  const comprovanteDaViagem = viagem.comprovanteFotoUrl ? {
+    id: `viagem-${viagem.id}`,
+    viagemId: viagem.id,
+    clienteNome: viagem.clienteNome,
+    motoristaNome: viagem.comprovanteMotoristaNome || viagem.motoristaNome,
+    notas: viagem.notas,
+    latitude: viagem.comprovanteLatitude ?? null,
+    longitude: viagem.comprovanteLongitude ?? null,
+    criadoEm: viagem.comprovanteEnviadoEm || viagem.entregaEm || null,
+    status: viagem.comprovanteStatus || 'pendente',
+    fotoUrl: viagem.comprovanteFotoUrl,
+  } : null;
+
+  const comprovanteEfetivo = comprovante || comprovanteDaViagem;
+
   const isEmRota = viagem.status === 'em_rota';
   const isEntregue = viagem.status === 'entregue';
 
@@ -168,11 +183,11 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
                 </div>
               </div>
               <div className="tl-item">
-                <div className={`tl-dot ${comprovante ? 'tl-dot-done' : 'tl-dot-pend'}`} />
+              <div className={`tl-dot ${comprovante ? 'tl-dot-done' : 'tl-dot-pend'}`} />
                 <div>
                   <div className="tl-title">Comprovante de entrega</div>
                   <div className="tl-sub">
-                    {comprovante ? 'Foto recebida — veja abaixo' : 'Aguardando envio pelo motorista'}
+                    {comprovanteEfetivo ? 'Foto recebida — veja abaixo' : 'Aguardando envio pelo motorista'}
                   </div>
                 </div>
               </div>
@@ -191,7 +206,7 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
           )}
 
           {/* Comprovante */}
-          {comprovante && (
+          {comprovanteEfetivo && (
             <div style={{ marginTop: 16 }}>
               <div className="card-title">Comprovante de entrega</div>
               <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 8 }}>
@@ -199,17 +214,17 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
                   Entrega confirmada pelo motorista
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 2 }}>
-                  {fmtData(comprovante.criadoEm)}
-                  {comprovante.latitude && ` · GPS: ${comprovante.latitude.toFixed(4)}, ${comprovante.longitude.toFixed(4)}`}
+                  {fmtData(comprovanteEfetivo.criadoEm)}
+                  {comprovanteEfetivo.latitude && ` · GPS: ${comprovanteEfetivo.latitude.toFixed(4)}, ${comprovanteEfetivo.longitude.toFixed(4)}`}
                 </div>
               </div>
               <img
-                src={comprovante.fotoUrl}
+                src={comprovanteEfetivo.fotoUrl}
                 alt="Comprovante de entrega"
                 className="proof-img"
               />
               <a
-                href={comprovante.fotoUrl}
+                href={comprovanteEfetivo.fotoUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="proof-link"
