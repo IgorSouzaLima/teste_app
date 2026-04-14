@@ -1,9 +1,6 @@
 // src/components/CardViagem.js
 import React, { useEffect, useState } from 'react';
-import {
-  doc, onSnapshot, collection, query,
-  orderBy, limit, where
-} from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import MapaAoVivo from './MapaAoVivo';
 import { format } from 'date-fns';
@@ -24,7 +21,6 @@ const statusBadge = {
 
 export default function CardViagem({ viagemId, defaultAberto = false }) {
   const [viagem, setViagem] = useState(null);
-  const [comprovante, setComprovante] = useState(null);
   const [aberto, setAberto] = useState(defaultAberto);
 
   const fmtData = (ts) => {
@@ -37,20 +33,6 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'viagens', viagemId), snap => {
       if (snap.exists()) setViagem({ id: snap.id, ...snap.data() });
-    });
-    return unsub;
-  }, [viagemId]);
-
-  // Ouvir comprovante desta viagem
-  useEffect(() => {
-    const q = query(
-      collection(db, 'comprovantes'),
-      where('viagemId', '==', viagemId),
-      limit(1)
-    );
-    const unsub = onSnapshot(q, snap => {
-      if (!snap.empty) setComprovante({ id: snap.docs[0].id, ...snap.docs[0].data() });
-      else setComprovante(null);
     });
     return unsub;
   }, [viagemId]);
@@ -70,10 +52,11 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
     fotoUrl: viagem.comprovanteFotoUrl,
   } : null;
 
-  const comprovanteEfetivo = comprovante || comprovanteDaViagem;
+  const comprovanteEfetivo = comprovanteDaViagem;
 
   const isEmRota = viagem.status === 'em_rota';
   const isEntregue = viagem.status === 'entregue';
+  const comprovanteEnviado = !!comprovanteEfetivo;
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
@@ -183,11 +166,13 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
                 </div>
               </div>
               <div className="tl-item">
-              <div className={`tl-dot ${comprovante ? 'tl-dot-done' : 'tl-dot-pend'}`} />
+                <div className={`tl-dot ${comprovanteEnviado ? 'tl-dot-done' : 'tl-dot-pend'}`} />
                 <div>
                   <div className="tl-title">Comprovante de entrega</div>
                   <div className="tl-sub">
-                    {comprovanteEfetivo ? 'Foto recebida — veja abaixo' : 'Aguardando envio pelo motorista'}
+                    {comprovanteEnviado
+                      ? 'Comprovante enviado pelo motorista — veja abaixo'
+                      : 'Aguardando envio pelo motorista'}
                   </div>
                 </div>
               </div>

@@ -8,7 +8,6 @@ import Dashboard from './pages/Dashboard';
 import Viagens from './pages/Viagens';
 import Motoristas from './pages/Motoristas';
 import Clientes from './pages/Clientes';
-import Comprovantes from './pages/Comprovantes';
 import './styles/global.css';
 
 function PrivateRoute({ children }) {
@@ -26,7 +25,6 @@ function AppRoutes() {
       <Route path="/viagens" element={<PrivateRoute><Viagens /></PrivateRoute>} />
       <Route path="/motoristas" element={<PrivateRoute><Motoristas /></PrivateRoute>} />
       <Route path="/clientes" element={<PrivateRoute><Clientes /></PrivateRoute>} />
-      <Route path="/comprovantes" element={<PrivateRoute><Comprovantes /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

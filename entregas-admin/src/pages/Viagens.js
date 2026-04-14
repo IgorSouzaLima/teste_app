@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   collection, addDoc, onSnapshot, orderBy, query,
-  serverTimestamp, doc, updateDoc, getDocs
+  serverTimestamp, doc, updateDoc, getDocs, where
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Layout from '../components/Layout';
@@ -13,6 +13,7 @@ import { ptBR } from 'date-fns/locale';
 
 const statusLabel = { agendada: 'Agendada', em_rota: 'Em rota', entregue: 'Entregue', cancelada: 'Cancelada' };
 const statusBadge = { agendada: 'badge-gray', em_rota: 'badge-info', entregue: 'badge-success', cancelada: 'badge-danger' };
+const comprovanteBadge = { pendente: 'badge-warning', confirmado: 'badge-success' };
 
 const EMPTY_FORM = {
   motoristaId: '', motoristaNome: '', motoristaPlaca: '',
@@ -46,6 +47,14 @@ export default function Viagens() {
 
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!showDetalhes?.id) return;
+    const atualizada = viagens.find((v) => v.id === showDetalhes.id);
+    if (atualizada) {
+      setShowDetalhes(atualizada);
+    }
+  }, [viagens, showDetalhes?.id]);
 
   const handleMotoristaChange = (id) => {
     const m = motoristas.find(x => x.id === id);
@@ -100,6 +109,30 @@ export default function Viagens() {
     if (!ts) return '—';
     const d = ts.toDate ? ts.toDate() : new Date(ts);
     return format(d, "dd/MM/yy HH:mm", { locale: ptBR });
+  };
+
+  const getComprovanteDaViagem = (viagem) => (
+    viagem?.comprovanteFotoUrl ? {
+      viagemId: viagem.id,
+      fotoUrl: viagem.comprovanteFotoUrl,
+      status: viagem.comprovanteStatus || 'pendente',
+      latitude: viagem.comprovanteLatitude ?? null,
+      longitude: viagem.comprovanteLongitude ?? null,
+      enviadoEm: viagem.comprovanteEnviadoEm || viagem.entregaEm || null,
+      motoristaNome: viagem.comprovanteMotoristaNome || viagem.motoristaNome,
+    } : null
+  );
+
+  const confirmarComprovante = async (viagem) => {
+    const comprovante = getComprovanteDaViagem(viagem);
+    if (!comprovante) return;
+
+    await updateDoc(doc(db, 'viagens', viagem.id), { comprovanteStatus: 'confirmado' });
+
+    const relacionados = await getDocs(query(collection(db, 'comprovantes'), where('viagemId', '==', viagem.id)));
+    await Promise.all(relacionados.docs.map((snap) => updateDoc(doc(db, 'comprovantes', snap.id), { status: 'confirmado' })));
+
+    toast.success('Comprovante confirmado');
   };
 
   const viagensFiltradas = filtro === 'todos'
@@ -170,7 +203,7 @@ export default function Viagens() {
                   <td className="text-muted text-sm">{fmtData(v.entregaEm)}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <button className="btn btn-sm" onClick={() => setShowDetalhes(v)}>Detalhes</button>
+                      <button className="btn btn-sm" onClick={() => setShowDetalhes(v)}>Ações</button>
                       {v.status === 'agendada' && (
                         <button className="btn btn-sm btn-danger" onClick={() => cancelarViagem(v.id)}>Cancelar</button>
                       )}
@@ -270,6 +303,10 @@ export default function Viagens() {
               <button className="btn-close" onClick={() => setShowDetalhes(null)}>×</button>
             </div>
             <div className="modal-body">
+              {(() => {
+                const comprovante = getComprovanteDaViagem(showDetalhes);
+                return (
+                  <>
               <div className="form-grid-2" style={{ marginBottom: 16 }}>
                 <div>
                   <div className="text-muted text-sm">Motorista</div>
@@ -306,12 +343,76 @@ export default function Viagens() {
                 </>
               )}
 
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontWeight: 500 }}>Comprovante da entrega</div>
+                    <div className="text-muted text-sm">
+                      {comprovante ? 'Foto enviada pelo motorista dentro desta viagem.' : 'Ainda nao foi enviado nenhum comprovante.'}
+                    </div>
+                  </div>
+                  {comprovante && (
+                    <span className={`badge ${comprovanteBadge[comprovante.status] || 'badge-warning'}`}>
+                      {comprovante.status === 'confirmado' ? 'Confirmado' : 'Pendente'}
+                    </span>
+                  )}
+                </div>
+
+                {comprovante ? (
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                    <div className="form-grid-2" style={{ marginBottom: 12 }}>
+                      <div>
+                        <div className="text-muted text-sm">Enviado em</div>
+                        <div style={{ fontWeight: 500 }}>{fmtData(comprovante.enviadoEm)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted text-sm">Motorista</div>
+                        <div style={{ fontWeight: 500 }}>{comprovante.motoristaNome}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted text-sm">GPS do envio</div>
+                        <div>
+                          {comprovante.latitude != null
+                            ? `${comprovante.latitude.toFixed(4)}, ${comprovante.longitude.toFixed(4)}`
+                            : '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <img
+                      src={comprovante.fotoUrl}
+                      alt="Comprovante da viagem"
+                      className="proof-img"
+                      style={{ width: '100%' }}
+                    />
+
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                      <a href={comprovante.fotoUrl} target="_blank" rel="noreferrer" className="btn">
+                        Abrir comprovante
+                      </a>
+                      {comprovante.status !== 'confirmado' && (
+                        <button className="btn btn-success" onClick={() => confirmarComprovante(showDetalhes)}>
+                          Confirmar comprovante
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ border: '1px dashed var(--border)', borderRadius: 12, padding: 16, color: 'var(--text-2)' }}>
+                    Assim que o motorista enviar a foto, ela aparecera aqui.
+                  </div>
+                )}
+              </div>
+
               {showDetalhes.observacoes && (
                 <div style={{ marginTop: 16 }}>
                   <div className="text-muted text-sm">Observações</div>
                   <div style={{ marginTop: 4 }}>{showDetalhes.observacoes}</div>
                 </div>
               )}
+                  </>
+                );
+              })()}
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={() => setShowDetalhes(null)}>Fechar</button>
