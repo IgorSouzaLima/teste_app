@@ -1,6 +1,6 @@
 // src/components/MapaAoVivo.js
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from 'react-leaflet';
 import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import L from 'leaflet';
@@ -23,6 +23,19 @@ function AutoCenter({ pos }) {
   useEffect(() => {
     if (pos) map.setView(pos, Math.max(map.getZoom(), 11), { animate: true });
   }, [pos, map]);
+  return null;
+}
+
+function FitTrail({ points }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!points.length) return;
+    if (points.length === 1) {
+      map.setView(points[0], Math.max(map.getZoom(), 12), { animate: true });
+      return;
+    }
+    map.fitBounds(points, { padding: [28, 28] });
+  }, [map, points]);
   return null;
 }
 
@@ -60,10 +73,10 @@ export default function MapaAoVivo({ viagemId, motoristaNome }) {
       q,
       (snap) => {
         const locs = snap.docs
-          .map(d => d.data())
+          .map(d => ({ id: d.id, ...d.data() }))
           .filter(l => l.lat != null && l.lng != null);
 
-        setHistorico(locs.map(l => [l.lat, l.lng]));
+        setHistorico(locs);
 
         if (locs.length > 0) {
           const ultima = locs[locs.length - 1];
@@ -93,6 +106,19 @@ export default function MapaAoVivo({ viagemId, motoristaNome }) {
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const fmtDataHora = (value) => {
+    if (!value) return 'Horario indisponivel';
+    const date = value?.toDate ? value.toDate() : new Date(value);
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const trilha = historico.map((ponto) => [ponto.lat, ponto.lng]);
+
   return (
     <div>
       {erro && (
@@ -110,6 +136,7 @@ export default function MapaAoVivo({ viagemId, motoristaNome }) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; OpenStreetMap'
           />
+          <FitTrail points={trilha.length ? trilha : (posicaoAtual ? [posicaoAtual] : [])} />
           {posicaoAtual && (
             <>
               <AutoCenter pos={posicaoAtual} />
@@ -121,22 +148,50 @@ export default function MapaAoVivo({ viagemId, motoristaNome }) {
               </Marker>
             </>
           )}
-          {historico.length > 1 && (
+          {trilha.length > 1 && (
             <Polyline
-              positions={historico}
+              positions={trilha}
               color="#185FA5"
-              weight={3}
-              opacity={0.55}
-              dashArray="6 4"
+              weight={4}
+              opacity={0.7}
             />
           )}
+          {historico.map((ponto, index) => {
+            const isUltimo = index === historico.length - 1;
+            const isPrimeiro = index === 0;
+            return (
+              <CircleMarker
+                key={ponto.id || `${ponto.lat}-${ponto.lng}-${index}`}
+                center={[ponto.lat, ponto.lng]}
+                radius={isUltimo ? 6 : 4}
+                pathOptions={{
+                  color: isUltimo ? '#185FA5' : (isPrimeiro ? '#2E7D32' : '#7D8A97'),
+                  fillColor: isUltimo ? '#185FA5' : (isPrimeiro ? '#2E7D32' : '#B9C3CC'),
+                  fillOpacity: isUltimo ? 0.95 : 0.82,
+                  weight: 2,
+                }}
+              >
+                <Popup>
+                  <strong>
+                    {isUltimo ? 'Posicao atual' : (isPrimeiro ? 'Inicio do trajeto' : `Ponto ${index + 1}`)}
+                  </strong>
+                  <br />
+                  Atualizado em {fmtDataHora(ponto.timestamp)}
+                  <br />
+                  Lat: {ponto.lat.toFixed(5)} | Lng: {ponto.lng.toFixed(5)}
+                  <br />
+                  Velocidade: {ponto.velocidade ?? 0} km/h
+                </Popup>
+              </CircleMarker>
+            );
+          })}
         </MapContainer>
       </div>
 
       {posicaoAtual ? (
         <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6, textAlign: 'center' }}>
           <span className="live-dot" />
-          Posição atualizada às {fmtHora(atualizadoEm)} · atualiza a cada 1 minuto
+          Posicao atualizada as {fmtHora(atualizadoEm)} · rastro salvo a cada 1 minuto
         </p>
       ) : (
         <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6, textAlign: 'center' }}>
