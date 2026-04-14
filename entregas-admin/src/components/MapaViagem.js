@@ -28,11 +28,19 @@ export default function MapaViagem({ viagemId }) {
   const [posicaoAtual, setPosicaoAtual] = useState(null);
   const [historico, setHistorico] = useState([]);
   const [viagem, setViagem] = useState(null);
+  const [erro, setErro] = useState('');
 
   useEffect(() => {
     // Dados da viagem
     const unsubViagem = onDocSnapshot(doc(db, 'viagens', viagemId), snap => {
-      if (snap.exists()) setViagem({ id: snap.id, ...snap.data() });
+      if (snap.exists()) {
+        const data = { id: snap.id, ...snap.data() };
+        setViagem(data);
+        const atual = data.localizacaoAtual;
+        if (atual?.lat != null && atual?.lng != null) {
+          setPosicaoAtual([atual.lat, atual.lng]);
+        }
+      }
     });
 
     // Histórico de localizações
@@ -40,14 +48,21 @@ export default function MapaViagem({ viagemId }) {
       collection(db, 'viagens', viagemId, 'localizacoes'),
       orderBy('timestamp', 'asc')
     );
-    const unsubLoc = onSnapshot(qLoc, snap => {
-      const locs = snap.docs.map(d => d.data());
-      setHistorico(locs.map(l => [l.lat, l.lng]));
-      if (locs.length > 0) {
-        const ultima = locs[locs.length - 1];
-        setPosicaoAtual([ultima.lat, ultima.lng]);
-      }
-    });
+    const unsubLoc = onSnapshot(
+      qLoc,
+      snap => {
+        const locs = snap.docs
+          .map(d => d.data())
+          .filter(l => l.lat != null && l.lng != null);
+        setHistorico(locs.map(l => [l.lat, l.lng]));
+        if (locs.length > 0) {
+          const ultima = locs[locs.length - 1];
+          setPosicaoAtual([ultima.lat, ultima.lng]);
+        }
+        setErro('');
+      },
+      () => setErro('Nao foi possivel carregar o rastreamento desta viagem.')
+    );
 
     return () => { unsubViagem(); unsubLoc(); };
   }, [viagemId]);
@@ -56,6 +71,9 @@ export default function MapaViagem({ viagemId }) {
 
   return (
     <div className="map-container">
+      {erro && (
+        <div style={{ padding: 12, color: 'var(--danger)' }}>{erro}</div>
+      )}
       <MapContainer center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -1,7 +1,7 @@
 // src/components/MapaAoVivo.js
 import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -30,24 +30,60 @@ export default function MapaAoVivo({ viagemId, motoristaNome }) {
   const [historico, setHistorico] = useState([]);
   const [posicaoAtual, setPosicaoAtual] = useState(null);
   const [atualizadoEm, setAtualizadoEm] = useState(null);
+  const [erro, setErro] = useState('');
 
   useEffect(() => {
+    const unsubViagem = onSnapshot(
+      doc(db, 'viagens', viagemId),
+      (snap) => {
+        if (!snap.exists()) return;
+        const atual = snap.data()?.localizacaoAtual;
+        if (atual?.lat != null && atual?.lng != null) {
+          setPosicaoAtual([atual.lat, atual.lng]);
+          const atualizado = atual.atualizadoEm?.toDate?.() || null;
+          if (atualizado) {
+            setAtualizadoEm(atualizado);
+          }
+        }
+      },
+      () => {
+        setErro('Nao foi possivel atualizar a viagem em tempo real.');
+      }
+    );
+
     const q = query(
       collection(db, 'viagens', viagemId, 'localizacoes'),
       orderBy('timestamp', 'asc')
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const locs = snap.docs.map(d => d.data()).filter(l => l.lat && l.lng);
-      setHistorico(locs.map(l => [l.lat, l.lng]));
-      if (locs.length > 0) {
-        const ultima = locs[locs.length - 1];
-        setPosicaoAtual([ultima.lat, ultima.lng]);
-        if (ultima.timestamp?.toDate) {
-          setAtualizadoEm(ultima.timestamp.toDate());
+
+    const unsubLoc = onSnapshot(
+      q,
+      (snap) => {
+        const locs = snap.docs
+          .map(d => d.data())
+          .filter(l => l.lat != null && l.lng != null);
+
+        setHistorico(locs.map(l => [l.lat, l.lng]));
+
+        if (locs.length > 0) {
+          const ultima = locs[locs.length - 1];
+          setPosicaoAtual([ultima.lat, ultima.lng]);
+          if (ultima.timestamp?.toDate) {
+            setAtualizadoEm(ultima.timestamp.toDate());
+          }
         }
+        setErro('');
+      },
+      () => {
+        setHistorico([]);
+        setErro('Nao foi possivel carregar o rastreamento agora.');
       }
-    });
-    return unsub;
+    );
+
+    return () => {
+      unsubViagem();
+      unsubLoc();
+    };
   }, [viagemId]);
 
   const center = posicaoAtual ?? [-21.5, -45.4];
@@ -59,6 +95,11 @@ export default function MapaAoVivo({ viagemId, motoristaNome }) {
 
   return (
     <div>
+      {erro && (
+        <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 0, marginBottom: 8, textAlign: 'center' }}>
+          {erro}
+        </p>
+      )}
       <div className="map-wrap">
         <MapContainer
           center={center} zoom={10}

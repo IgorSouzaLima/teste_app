@@ -1,7 +1,7 @@
 // src/pages/Dashboard.js
 import React, { useEffect, useState } from 'react';
 import {
-  collection, query, where, onSnapshot, orderBy
+  collection, query, where, onSnapshot
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
@@ -11,19 +11,46 @@ export default function Dashboard() {
   const { clienteData, logout } = useAuth();
   const [viagens, setViagens] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [aba, setAba] = useState('ativas');
 
   useEffect(() => {
-    if (!clienteData?.id) return;
+    if (!clienteData?.id) {
+      setViagens([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError('');
+
     const q = query(
       collection(db, 'viagens'),
-      where('clienteId', '==', clienteData.id),
-      orderBy('criadoEm', 'desc')
+      where('clienteId', '==', clienteData.id)
     );
-    const unsub = onSnapshot(q, snap => {
-      setViagens(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    });
+
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        const docs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const aTs = a.criadoEm?.toMillis?.() || 0;
+            const bTs = b.criadoEm?.toMillis?.() || 0;
+            return bTs - aTs;
+          });
+
+        setViagens(docs);
+        setLoadError('');
+        setLoading(false);
+      },
+      () => {
+        setViagens([]);
+        setLoadError('Nao foi possivel carregar suas entregas agora.');
+        setLoading(false);
+      }
+    );
+
     return unsub;
   }, [clienteData]);
 
@@ -94,12 +121,12 @@ export default function Dashboard() {
           <div className="empty">
             <div className="empty-icon">{aba === 'ativas' ? '📦' : '✅'}</div>
             <div className="empty-title">
-              {aba === 'ativas' ? 'Nenhuma entrega em andamento' : 'Nenhuma entrega no histórico'}
+              {loadError || (aba === 'ativas' ? 'Nenhuma entrega em andamento' : 'Nenhuma entrega no histórico')}
             </div>
             <div className="empty-sub">
-              {aba === 'ativas'
+              {loadError || (aba === 'ativas'
                 ? 'Quando uma entrega for lançada para você, ela aparecerá aqui.'
-                : 'Suas entregas concluídas aparecerão aqui.'}
+                : 'Suas entregas concluídas aparecerão aqui.')}
             </div>
           </div>
         )}

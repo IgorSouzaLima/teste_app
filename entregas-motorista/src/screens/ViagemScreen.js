@@ -2,9 +2,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, Image, ActivityIndicator, Platform
+  Alert, Image, ActivityIndicator
 } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
@@ -16,20 +15,40 @@ import { colors, s } from '../styles';
 
 export default function ViagemScreen({ route, navigation }) {
   const { viagem: viagemInicial } = route.params;
-  const { motorista, user } = useAuth();
+  const { motorista } = useAuth();
   const [viagem, setViagem] = useState(viagemInicial);
   const [historico, setHistorico] = useState([]);
   const [posicaoAtual, setPosicaoAtual] = useState(null);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null);
+  const [trackingError, setTrackingError] = useState('');
   const [fotoUri, setFotoUri] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const mapRef = useRef(null);
+  const scrollRef = useRef(null);
 
   // Ouvir updates da viagem em tempo real
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'viagens', viagem.id), snap => {
-      if (snap.exists()) setViagem({ id: snap.id, ...snap.data() });
-    });
+    const unsub = onSnapshot(
+      doc(db, 'viagens', viagem.id),
+      snap => {
+        if (!snap.exists()) return;
+
+        const data = { id: snap.id, ...snap.data() };
+        setViagem(data);
+
+        const atual = data.localizacaoAtual;
+        if (atual?.lat != null && atual?.lng != null) {
+          setPosicaoAtual({ latitude: atual.lat, longitude: atual.lng });
+          const atualizado = atual.atualizadoEm?.toDate?.() || null;
+          if (atualizado) {
+            setUltimaAtualizacao(atualizado);
+          }
+        }
+
+        setTrackingError('');
+      },
+      () => setTrackingError('Nao foi possivel acompanhar o rastreamento desta viagem.')
+    );
     return unsub;
   }, [viagem.id]);
 
@@ -39,18 +58,29 @@ export default function ViagemScreen({ route, navigation }) {
       collection(db, 'viagens', viagem.id, 'localizacoes'),
       orderBy('timestamp', 'asc')
     );
-    const unsub = onSnapshot(q, snap => {
-      const locs = snap.docs.map(d => d.data());
-      const coords = locs.filter(l => l.lat && l.lng).map(l => ({ latitude: l.lat, longitude: l.lng }));
-      setHistorico(coords);
-      if (coords.length > 0) {
-        const ultima = coords[coords.length - 1];
-        setPosicaoAtual(ultima);
-        mapRef.current?.animateToRegion({
-          ...ultima, latitudeDelta: 0.05, longitudeDelta: 0.05
-        }, 500);
-      }
-    });
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        const locs = snap.docs
+          .map(d => d.data())
+          .filter(l => l.lat != null && l.lng != null);
+        const coords = locs.map(l => ({ latitude: l.lat, longitude: l.lng }));
+
+        setHistorico(coords);
+
+        if (coords.length > 0) {
+          const ultima = coords[coords.length - 1];
+          setPosicaoAtual(ultima);
+          const atualizado = locs[locs.length - 1]?.timestamp?.toDate?.() || null;
+          if (atualizado) {
+            setUltimaAtualizacao(atualizado);
+          }
+        }
+
+        setTrackingError('');
+      },
+      () => setTrackingError('Nao foi possivel carregar o historico de localizacao.')
+    );
     return unsub;
   }, [viagem.id]);
 
@@ -194,18 +224,16 @@ export default function ViagemScreen({ route, navigation }) {
     );
   };
 
-  const defaultRegion = {
-    latitude: posicaoAtual?.latitude ?? -21.5,
-    longitude: posicaoAtual?.longitude ?? -45.4,
-    latitudeDelta: 0.3,
-    longitudeDelta: 0.3,
-  };
-
   const isEmRota = viagem.status === 'em_rota';
   const isAgendada = viagem.status === 'agendada';
+  const fmtCoords = (valor) => (typeof valor === 'number' ? valor.toFixed(5) : '—');
+  const fmtHora = (data) => {
+    if (!data) return 'Aguardando primeira atualizacao';
+    return data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+    <ScrollView ref={scrollRef} style={s.screen} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
 
       {/* Cabeçalho da viagem */}
       <View style={s.card}>
@@ -289,24 +317,41 @@ export default function ViagemScreen({ route, navigation }) {
       {/* Mapa GPS */}
       {isEmRota && (
         <View style={s.card}>
-          <Text style={s.cardTitle}>Sua localização ao vivo</Text>
-          <MapView
-            ref={mapRef}
-            style={s.map}
-            initialRegion={defaultRegion}
-            showsUserLocation={true}
-            followsUserLocation={true}
-          >
-            {posicaoAtual && (
-              <Marker coordinate={posicaoAtual} title="Você está aqui" />
-            )}
-            {historico.length > 1 && (
-              <Polyline coordinates={historico} strokeColor={colors.primary} strokeWidth={3} />
-            )}
-          </MapView>
-          <Text style={[s.small, { marginTop: 6, textAlign: 'center' }]}>
-            Posição atualizada automaticamente a cada 10 segundos
-          </Text>
+          <Text style={s.cardTitle}>Rastreamento ativo</Text>
+          <View style={{
+            backgroundColor: colors.primaryBg,
+            borderRadius: 10,
+            padding: 14,
+            borderWidth: 1,
+            borderColor: '#B5D4F4',
+          }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primaryText }}>
+              GPS enviando sua localizacao
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.primaryText, marginTop: 6 }}>
+              Ultima atualizacao: {fmtHora(ultimaAtualizacao)}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.primaryText, marginTop: 4 }}>
+              Latitude: {fmtCoords(posicaoAtual?.latitude)}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.primaryText, marginTop: 2 }}>
+              Longitude: {fmtCoords(posicaoAtual?.longitude)}
+            </Text>
+            <Text style={{ fontSize: 12, color: colors.primaryText, marginTop: 10 }}>
+              {historico.length > 1
+                ? `${historico.length} pontos enviados para o admin e o cliente.`
+                : 'A primeira posicao pode levar alguns segundos para aparecer.'}
+            </Text>
+          </View>
+          {trackingError ? (
+            <Text style={[s.small, { marginTop: 8, textAlign: 'center', color: colors.danger }]}>
+              {trackingError}
+            </Text>
+          ) : (
+            <Text style={[s.small, { marginTop: 8, textAlign: 'center' }]}>
+              Admin e cliente recebem as atualizacoes em tempo real.
+            </Text>
+          )}
         </View>
       )}
 
