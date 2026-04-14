@@ -63,10 +63,9 @@ export async function iniciarRastreamento(viagemId, motoristaId) {
   const isRunning = await Location.hasStartedLocationUpdatesAsync(GPS_TASK_NAME).catch(() => false);
   if (!isRunning) {
     await Location.startLocationUpdatesAsync(GPS_TASK_NAME, {
-      accuracy: Location.Accuracy.High,
+      accuracy: Location.Accuracy.Balanced,
       timeInterval: 10000,       // a cada 10 segundos
       distanceInterval: 20,      // ou a cada 20 metros
-      showsBackgroundLocationIndicator: true,
       foregroundService: {
         notificationTitle: 'Entrega em andamento',
         notificationBody: 'Rastreamento GPS ativo — toque para abrir o app',

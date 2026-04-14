@@ -69,11 +69,11 @@ export default function ViagemScreen({ route, navigation }) {
                 Alert.alert('Permissão necessária', 'Ative a localização para iniciar a viagem.');
                 return;
               }
+              await iniciarRastreamento(viagem.id, motorista.id);
               await updateDoc(doc(db, 'viagens', viagem.id), {
                 status: 'em_rota',
                 saidaEm: serverTimestamp(),
               });
-              await iniciarRastreamento(viagem.id, motorista.id);
             } catch (e) {
               Alert.alert('Erro', e.message);
             }
