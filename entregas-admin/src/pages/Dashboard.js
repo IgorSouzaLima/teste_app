@@ -1,22 +1,22 @@
 // src/pages/Dashboard.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { collection, query, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Layout from '../components/Layout';
 import MapaViagem from '../components/MapaViagem';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { filterViagensByStatusAndNota } from '../lib/viagemView';
+import { buildAlertasOperacionais, buildViagensCsv, filterViagensPorPainel } from '../lib/operacaoView';
 
 const statusLabel = { agendada: 'Agendada', em_rota: 'Em rota', entregue: 'Entregue', cancelada: 'Cancelada' };
 const statusBadge = { agendada: 'badge-gray', em_rota: 'badge-info', entregue: 'badge-success', cancelada: 'badge-danger' };
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ total: 0, agendadas: 0, em_rota: 0, entregues: 0 });
   const [viagens, setViagens] = useState([]);
   const [viagemSelecionada, setViagemSelecionada] = useState(null);
   const [statusFiltro, setStatusFiltro] = useState('todos');
   const [buscaNota, setBuscaNota] = useState('');
+  const [periodo, setPeriodo] = useState('30d');
 
   useEffect(() => {
     const q = query(
@@ -28,12 +28,6 @@ export default function Dashboard() {
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setViagens(docs);
-      setStats({
-        total: docs.length,
-        agendadas: docs.filter(v => v.status === 'agendada').length,
-        em_rota: docs.filter(v => v.status === 'em_rota').length,
-        entregues: docs.filter(v => v.status === 'entregue').length,
-      });
     });
     return unsub;
   }, []);
@@ -44,7 +38,35 @@ export default function Dashboard() {
     return format(d, "dd/MM HH:mm", { locale: ptBR });
   };
 
-  const viagensFiltradas = filterViagensByStatusAndNota(viagens, statusFiltro, buscaNota);
+  const viagensNoPeriodo = useMemo(
+    () => filterViagensPorPainel(viagens, { status: 'todos', nota: '', periodo }),
+    [viagens, periodo]
+  );
+
+  const stats = useMemo(() => ({
+    total: viagensNoPeriodo.length,
+    agendadas: viagensNoPeriodo.filter(v => v.status === 'agendada').length,
+    em_rota: viagensNoPeriodo.filter(v => v.status === 'em_rota').length,
+    entregues: viagensNoPeriodo.filter(v => v.status === 'entregue').length,
+  }), [viagensNoPeriodo]);
+
+  const viagensFiltradas = useMemo(
+    () => filterViagensPorPainel(viagens, { status: statusFiltro, nota: buscaNota, periodo }),
+    [viagens, statusFiltro, buscaNota, periodo]
+  );
+
+  const alertas = useMemo(() => buildAlertasOperacionais(viagensNoPeriodo), [viagensNoPeriodo]);
+
+  const handleExportar = () => {
+    const csv = buildViagensCsv(viagensFiltradas);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dashboard-viagens-${periodo}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const cardStyle = (ativo) => ({
     cursor: 'pointer',
@@ -73,6 +95,39 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="page-toolbar" style={{ marginTop: 18 }}>
+        <div>
+          <div className="card-title" style={{ marginBottom: 4 }}>Alertas operacionais</div>
+          <div className="card-subtitle">Leitura rápida da operação considerando o período selecionado.</div>
+        </div>
+        <div className="toolbar-actions">
+          <select className="form-select" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ minWidth: 170 }}>
+            <option value="all">Período completo</option>
+            <option value="30d">Últimos 30 dias</option>
+            <option value="7d">Últimos 7 dias</option>
+            <option value="1d">Hoje</option>
+          </select>
+          <button className="btn" onClick={handleExportar}>
+            Exportar CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="alert-grid">
+        {alertas.length === 0 ? (
+          <div className="alert-card alert-card-neutral">
+            <div className="alert-card-title">Sem alertas críticos no período</div>
+            <div className="alert-card-copy">A operação está sem comprovantes pendentes e sem viagens aguardando atenção imediata.</div>
+          </div>
+        ) : alertas.map((alerta) => (
+          <div key={alerta.id} className={`alert-card alert-card-${alerta.tone}`}>
+            <div className="alert-card-kicker">{alerta.count} ocorrência{alerta.count > 1 ? 's' : ''}</div>
+            <div className="alert-card-title">{alerta.title}</div>
+            <div className="alert-card-copy">{alerta.description}</div>
+          </div>
+        ))}
+      </div>
+
       {viagemSelecionada && (
         <div className="card">
           <div className="card-header">
@@ -87,17 +142,19 @@ export default function Dashboard() {
 
       <div className="card" style={{ marginBottom: 0 }}>
         <div className="card-header">
-          <div>
-            <div className="card-title">Viagens recentes</div>
-            <div className="card-subtitle">Consulte as últimas cargas lançadas e filtre rapidamente por nota e status.</div>
+            <div>
+              <div className="card-title">Viagens recentes</div>
+            <div className="card-subtitle">Consulte as últimas cargas lançadas, filtre por status, nota e período, e exporte o recorte atual.</div>
           </div>
-          <input
-            className="form-input"
-            value={buscaNota}
-            onChange={(e) => setBuscaNota(e.target.value)}
-            placeholder="Buscar por número da nota"
-            style={{ maxWidth: 240 }}
-          />
+          <div className="toolbar-actions">
+            <input
+              className="form-input"
+              value={buscaNota}
+              onChange={(e) => setBuscaNota(e.target.value)}
+              placeholder="Buscar por número da nota"
+              style={{ maxWidth: 240 }}
+            />
+          </div>
         </div>
         <div className="table-wrap">
           <table>

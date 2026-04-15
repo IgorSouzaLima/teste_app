@@ -1,5 +1,5 @@
 // src/pages/Dashboard.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   collection, query, where, onSnapshot
 } from 'firebase/firestore';
@@ -7,18 +7,23 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import CardViagem from '../components/CardViagem';
 import {
-  filterViagensDaAba,
   sortViagensByCriadoEmDesc,
-  splitViagensPorAba,
 } from '../lib/viagemCliente';
+import {
+  buildAlertasCliente,
+  buildViagensClienteCsv,
+  filterViagensCliente,
+  getStatusTabsCliente,
+} from '../lib/painelCliente';
 
 export default function Dashboard() {
   const { clienteData, logout } = useAuth();
   const [viagens, setViagens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [aba, setAba] = useState('ativas');
+  const [statusFiltro, setStatusFiltro] = useState('todos');
   const [buscaNota, setBuscaNota] = useState('');
+  const [periodo, setPeriodo] = useState('all');
 
   useEffect(() => {
     if (!clienteData?.id) {
@@ -54,8 +59,26 @@ export default function Dashboard() {
     return unsub;
   }, [clienteData]);
 
-  const { ativas, historico, emRota } = splitViagensPorAba(viagens);
-  const lista = filterViagensDaAba(viagens, aba, buscaNota);
+  const tabs = useMemo(() => getStatusTabsCliente(viagens), [viagens]);
+  const lista = useMemo(
+    () => filterViagensCliente(viagens, { status: statusFiltro, nota: buscaNota, periodo }),
+    [viagens, statusFiltro, buscaNota, periodo]
+  );
+  const alertas = useMemo(() => buildAlertasCliente(viagens), [viagens]);
+  const emRota = viagens.filter((viagem) => viagem.status === 'em_rota');
+  const totalHistorico = viagens.filter((viagem) => viagem.status === 'entregue' || viagem.status === 'cancelada').length;
+  const totalAgendadas = viagens.filter((viagem) => viagem.status === 'agendada').length;
+
+  const handleExportar = () => {
+    const csv = buildViagensClienteCsv(lista);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cliente-entregas-${statusFiltro}-${periodo}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <>
@@ -84,18 +107,33 @@ export default function Dashboard() {
           </div>
           <div className="hero-stats">
             <div className="hero-stat">
-              <strong>{ativas.length}</strong>
-              <span>Entregas em andamento</span>
+              <strong>{emRota.length}</strong>
+              <span>Entregas em rota</span>
             </div>
             <div className="hero-stat">
-              <strong>{historico.length}</strong>
+              <strong>{totalHistorico}</strong>
               <span>Entregas no histórico</span>
             </div>
             <div className="hero-stat">
-              <strong>{viagens.length}</strong>
-              <span>Total de viagens vinculadas</span>
+              <strong>{totalAgendadas}</strong>
+              <span>Entregas aguardando início</span>
             </div>
           </div>
+        </div>
+
+        <div className="alert-grid">
+          {alertas.length === 0 ? (
+            <div className="alert-card alert-card-neutral">
+              <div className="alert-card-title">Sem novidades agora</div>
+              <div className="alert-card-copy">Quando uma entrega sair, for concluída ou liberar comprovante, o resumo aparece aqui.</div>
+            </div>
+          ) : alertas.map((alerta) => (
+            <div key={alerta.id} className={`alert-card alert-card-${alerta.tone}`}>
+              <div className="alert-card-kicker">{alerta.count} atualização{alerta.count > 1 ? 'ões' : ''}</div>
+              <div className="alert-card-title">{alerta.title}</div>
+              <div className="alert-card-copy">{alerta.description}</div>
+            </div>
+          ))}
         </div>
 
         {/* Banner de entrega em rota */}
@@ -120,19 +158,16 @@ export default function Dashboard() {
         )}
 
         {/* Tabs */}
-        <div className="tabs">
-          <button
-            className={`tab ${aba === 'ativas' ? 'active' : ''}`}
-            onClick={() => setAba('ativas')}
-          >
-            Em andamento {ativas.length > 0 && `(${ativas.length})`}
-          </button>
-          <button
-            className={`tab ${aba === 'historico' ? 'active' : ''}`}
-            onClick={() => setAba('historico')}
-          >
-            Histórico {historico.length > 0 && `(${historico.length})`}
-          </button>
+        <div className="tabs tabs-rich">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`tab ${statusFiltro === tab.id ? 'active' : ''}`}
+              onClick={() => setStatusFiltro(tab.id)}
+            >
+              {tab.label} {tab.count > 0 && `(${tab.count})`}
+            </button>
+          ))}
         </div>
 
         <div className="search-row">
@@ -142,6 +177,15 @@ export default function Dashboard() {
             onChange={(e) => setBuscaNota(e.target.value)}
             placeholder="Buscar por número da nota"
           />
+          <select className="form-select" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ maxWidth: 170 }}>
+            <option value="all">Período completo</option>
+            <option value="30d">Últimos 30 dias</option>
+            <option value="7d">Últimos 7 dias</option>
+            <option value="1d">Hoje</option>
+          </select>
+          <button className="topbar-logout" onClick={handleExportar} style={{ whiteSpace: 'nowrap' }}>
+            Exportar CSV
+          </button>
         </div>
 
         {/* Loading */}
@@ -154,14 +198,12 @@ export default function Dashboard() {
         {/* Lista de viagens */}
         {!loading && lista.length === 0 && (
           <div className="empty">
-            <div className="empty-icon">{aba === 'ativas' ? '📦' : '✅'}</div>
+            <div className="empty-icon">{statusFiltro === 'entregue' || statusFiltro === 'cancelada' ? '✅' : '📦'}</div>
             <div className="empty-title">
-              {loadError || (aba === 'ativas' ? 'Nenhuma entrega em andamento' : 'Nenhuma entrega no histórico')}
+              {loadError || 'Nenhuma entrega encontrada'}
             </div>
             <div className="empty-sub">
-              {loadError || (aba === 'ativas'
-                ? 'Quando uma entrega for lançada para você, ela aparecerá aqui.'
-                : 'Suas entregas concluídas aparecerão aqui.')}
+              {loadError || 'Ajuste os filtros ou aguarde novas atualizações da operação.'}
             </div>
           </div>
         )}

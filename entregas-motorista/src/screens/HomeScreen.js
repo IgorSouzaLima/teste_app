@@ -72,6 +72,10 @@ export default function HomeScreen({ navigation }) {
     return format(d, "dd/MM HH:mm", { locale: ptBR });
   };
 
+  const viagensAgendadas = viagens.filter((item) => item.status === 'agendada');
+  const viagensEmRota = viagens.filter((item) => item.status === 'em_rota');
+  const viagensEntregues = viagens.filter((item) => item.status === 'entregue');
+
   const renderViagem = ({ item }) => {
     const sc = statusColor[item.status] || statusColor.agendada;
     const podeTap = item.status === 'agendada' || item.status === 'em_rota';
@@ -131,6 +135,29 @@ export default function HomeScreen({ navigation }) {
         <Text style={s.headerSub}>{motorista?.placa} · {motorista?.veiculo}</Text>
       </View>
 
+      <View style={st.alertPanel}>
+        <Text style={st.alertTitle}>Central de avisos</Text>
+        <View style={st.alertGrid}>
+          <View style={[st.alertCard, { backgroundColor: colors.primaryBg }]}>
+            <Text style={[st.alertCount, { color: colors.primaryText }]}>{viagensAgendadas.length}</Text>
+            <Text style={st.alertLabel}>Aguardando início</Text>
+          </View>
+          <View style={[st.alertCard, { backgroundColor: '#eef6ff' }]}>
+            <Text style={[st.alertCount, { color: colors.primary }]}>{viagensEmRota.length}</Text>
+            <Text style={st.alertLabel}>Em andamento</Text>
+          </View>
+          <View style={[st.alertCard, { backgroundColor: colors.successBg }]}>
+            <Text style={[st.alertCount, { color: colors.success }]}>{viagensEntregues.length}</Text>
+            <Text style={st.alertLabel}>Já concluídas</Text>
+          </View>
+        </View>
+        <Text style={st.alertCopy}>
+          {viagensAgendadas.length > 0
+            ? 'As viagens novas aparecem acima e podem ser iniciadas diretamente pela lista.'
+            : 'Sem novas cargas pendentes. Assim que o admin lançar uma viagem, ela aparece aqui.'}
+        </Text>
+      </View>
+
       <FlatList
         data={viagens}
         keyExtractor={item => item.id}
@@ -154,6 +181,46 @@ export default function HomeScreen({ navigation }) {
 }
 
 const st = StyleSheet.create({
+  alertPanel: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+  },
+  alertTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  alertGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  alertCard: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 12,
+  },
+  alertCount: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  alertLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.text2,
+    fontWeight: '500',
+  },
+  alertCopy: {
+    marginTop: 12,
+    fontSize: 12,
+    color: colors.text2,
+    lineHeight: 18,
+  },
   itemCard: {
     backgroundColor: colors.surface,
     borderRadius: 12,

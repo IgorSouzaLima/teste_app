@@ -60,6 +60,35 @@ Para visualizar:
 - entre no admin
 - abra a seção `Auditoria`
 
+### Fases 3 a 5 — Alertas, relatórios e refinamento visual
+
+Sem alterar o fluxo principal, o sistema agora também oferece:
+- `admin`
+  - alertas operacionais derivados das viagens
+  - filtro por período no `Dashboard` e em `Viagens`
+  - exportação `CSV` das viagens filtradas
+- `cliente`
+  - painel com alertas de rota, comprovante disponível e cargas agendadas
+  - filtros por status, período e nota fiscal
+  - exportação `CSV` das entregas visíveis no filtro atual
+- `motorista`
+  - central de avisos na tela inicial com resumo de cargas agendadas, em andamento e concluídas
+
+### Smoke test adicional recomendado
+
+1. Admin:
+   - abrir `Dashboard`
+   - mudar o período entre `Hoje`, `7 dias` e `30 dias`
+   - exportar o `CSV`
+   - abrir `Viagens`, aplicar filtro por status e exportar novamente
+2. Cliente:
+   - alternar entre `Todas`, `Agendadas`, `Em rota`, `Entregues` e `Canceladas`
+   - buscar por nota fiscal
+   - mudar o período e exportar o `CSV`
+3. Motorista:
+   - abrir a tela inicial
+   - conferir a central de avisos e o total de viagens em cada estado
+
 ---
 
 ## PASSO 1 — Criar o projeto Firebase

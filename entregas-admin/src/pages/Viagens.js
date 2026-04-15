@@ -1,5 +1,5 @@
 // src/pages/Viagens.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   collection, addDoc, onSnapshot, orderBy, query,
   serverTimestamp, doc, updateDoc, getDocs, where, limit
@@ -12,9 +12,9 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../lib/AuthContext';
 import { registrarAuditoria } from '../lib/auditoria';
+import { buildAlertasOperacionais, buildViagensCsv, filterViagensPorPainel } from '../lib/operacaoView';
 import {
   buildNovaViagemPayload,
-  filterViagensByStatusAndNota,
   getComprovanteDaViagem,
   getResumoVeiculo,
   normalizarComprovanteDaColecao,
@@ -45,6 +45,7 @@ export default function Viagens() {
   const [saving, setSaving] = useState(false);
   const [filtro, setFiltro] = useState('todos');
   const [buscaNota, setBuscaNota] = useState('');
+  const [periodo, setPeriodo] = useState('all');
 
   useEffect(() => {
     const q = query(collection(db, 'viagens'), orderBy('criadoEm', 'desc'));
@@ -209,7 +210,25 @@ export default function Viagens() {
     toast.success('Comprovante confirmado');
   };
 
-  const viagensFiltradasPorNota = filterViagensByStatusAndNota(viagens, filtro, buscaNota);
+  const viagensFiltradasPorNota = useMemo(
+    () => filterViagensPorPainel(viagens, { status: filtro, nota: buscaNota, periodo }),
+    [viagens, filtro, buscaNota, periodo]
+  );
+  const alertas = useMemo(
+    () => buildAlertasOperacionais(filterViagensPorPainel(viagens, { status: 'todos', nota: '', periodo })),
+    [viagens, periodo]
+  );
+
+  const handleExportar = () => {
+    const csv = buildViagensCsv(viagensFiltradasPorNota);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `viagens-${filtro}-${periodo}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <Layout title="Viagens">
@@ -228,6 +247,12 @@ export default function Viagens() {
           ))}
         </div>
         <div className="toolbar-actions">
+          <select className="form-select" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ minWidth: 170 }}>
+            <option value="all">Período completo</option>
+            <option value="30d">Últimos 30 dias</option>
+            <option value="7d">Últimos 7 dias</option>
+            <option value="1d">Hoje</option>
+          </select>
           <input
             className="form-input"
             value={buscaNota}
@@ -235,11 +260,27 @@ export default function Viagens() {
             placeholder="Buscar por número da nota"
             style={{ minWidth: 220 }}
           />
+          <button className="btn" onClick={handleExportar}>Exportar CSV</button>
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Nova viagem
           </button>
         </div>
+      </div>
+
+      <div className="alert-grid" style={{ marginBottom: 18 }}>
+        {alertas.length === 0 ? (
+          <div className="alert-card alert-card-neutral">
+            <div className="alert-card-title">Sem alertas neste recorte</div>
+            <div className="alert-card-copy">O período selecionado não tem comprovantes pendentes nem viagens exigindo atenção imediata.</div>
+          </div>
+        ) : alertas.map((alerta) => (
+          <div key={alerta.id} className={`alert-card alert-card-${alerta.tone}`}>
+            <div className="alert-card-kicker">{alerta.count} ocorrência{alerta.count > 1 ? 's' : ''}</div>
+            <div className="alert-card-title">{alerta.title}</div>
+            <div className="alert-card-copy">{alerta.description}</div>
+          </div>
+        ))}
       </div>
 
       <div className="card" style={{ marginBottom: 0 }}>
