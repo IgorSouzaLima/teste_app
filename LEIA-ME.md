@@ -9,6 +9,44 @@
 /entregas-motorista/      ← App Android (React Native + Expo)
 ```
 
+## Fase 1 — Estabilização e checagem segura
+
+Antes de avançar para melhorias maiores, esta fase protege os fluxos críticos do sistema com testes e uma checagem rápida de smoke test.
+
+### Testes automatizados web
+
+Admin:
+```bash
+cd entregas-admin
+CI=true npm test -- --watch=false --runInBand src/lib/viagemView.test.js src/lib/authAccess.test.js src/lib/createAuthUser.test.js
+npm run build
+```
+
+Cliente:
+```bash
+cd entregas-cliente
+CI=true npm test -- --watch=false --runInBand src/lib/viagemCliente.test.js
+npm run build
+```
+
+### Smoke test manual recomendado
+
+1. Admin:
+   - entrar com usuário admin
+   - lançar uma viagem nova
+   - filtrar por status
+   - buscar por número de nota
+   - abrir `Ações` e conferir comprovante em viagem entregue
+2. Cliente:
+   - entrar com usuário cliente
+   - alternar entre `Em andamento` e `Histórico`
+   - buscar por número de nota
+   - abrir uma entrega concluída e conferir o comprovante correto
+3. Motorista:
+   - iniciar uma viagem
+   - confirmar se o admin recebe localização
+   - concluir entrega e enviar comprovante
+
 ---
 
 ## PASSO 1 — Criar o projeto Firebase

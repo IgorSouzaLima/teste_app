@@ -6,6 +6,11 @@ import {
 import { db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import CardViagem from '../components/CardViagem';
+import {
+  filterViagensDaAba,
+  sortViagensByCriadoEmDesc,
+  splitViagensPorAba,
+} from '../lib/viagemCliente';
 
 export default function Dashboard() {
   const { clienteData, logout } = useAuth();
@@ -33,13 +38,7 @@ export default function Dashboard() {
     const unsub = onSnapshot(
       q,
       snap => {
-        const docs = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => {
-            const aTs = a.criadoEm?.toMillis?.() || 0;
-            const bTs = b.criadoEm?.toMillis?.() || 0;
-            return bTs - aTs;
-          });
+        const docs = sortViagensByCriadoEmDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })));
 
         setViagens(docs);
         setLoadError('');
@@ -55,16 +54,8 @@ export default function Dashboard() {
     return unsub;
   }, [clienteData]);
 
-  const ativas = viagens.filter(v => v.status === 'agendada' || v.status === 'em_rota');
-  const historico = viagens.filter(v => v.status === 'entregue' || v.status === 'cancelada');
-  const emRota = viagens.filter(v => v.status === 'em_rota');
-
-  const listaBase = aba === 'ativas' ? ativas : historico;
-  const lista = listaBase.filter((viagem) => {
-    if (!buscaNota.trim()) return true;
-    const termo = buscaNota.trim().toLowerCase();
-    return (viagem.notas || []).some((nota) => String(nota).toLowerCase().includes(termo));
-  });
+  const { ativas, historico, emRota } = splitViagensPorAba(viagens);
+  const lista = filterViagensDaAba(viagens, aba, buscaNota);
 
   return (
     <>

@@ -10,6 +10,13 @@ import MapaViagem from '../components/MapaViagem';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import {
+  buildNovaViagemPayload,
+  filterViagensByStatusAndNota,
+  getComprovanteDaViagem,
+  getResumoVeiculo,
+  normalizarComprovanteDaColecao,
+} from '../lib/viagemView';
 
 const statusLabel = { agendada: 'Agendada', em_rota: 'Em rota', entregue: 'Entregue', cancelada: 'Cancelada' };
 const statusBadge = { agendada: 'badge-gray', em_rota: 'badge-info', entregue: 'badge-success', cancelada: 'badge-danger' };
@@ -21,25 +28,6 @@ const EMPTY_FORM = {
   veiculoId: '', veiculoNome: '', veiculoPlaca: '',
   clienteId: '', clienteNome: '',
   notasRaw: '', cidadeDestino: '', observacoes: ''
-};
-
-const getFotoUrl = (item) => item?.fotoUrl || item?.comprovanteFotoUrl || item?.secure_url || item?.url || null;
-
-const normalizarComprovanteDaColecao = (viagem, item) => {
-  const fotoUrl = getFotoUrl(item);
-  if (!fotoUrl) return null;
-
-  return {
-    viagemId: item.viagemId || viagem.id,
-    id: item.id,
-    fotoUrl,
-    status: item.status || item.comprovanteStatus || 'pendente',
-    latitude: item.latitude ?? item.comprovanteLatitude ?? null,
-    longitude: item.longitude ?? item.comprovanteLongitude ?? null,
-    enviadoEm: item.criadoEm || item.enviadoEm || item.comprovanteEnviadoEm || null,
-    motoristaNome: item.motoristaNome || item.comprovanteMotoristaNome || viagem.motoristaNome,
-    source: 'collection',
-  };
 };
 
 export default function Viagens() {
@@ -145,25 +133,7 @@ export default function Viagens() {
     }
     setSaving(true);
     try {
-      const notas = form.notasRaw.split(',').map(n => n.trim()).filter(Boolean);
-      await addDoc(collection(db, 'viagens'), {
-        motoristaId: form.motoristaId,
-        motoristaNome: form.motoristaNome,
-        motoristaPlaca: form.veiculoPlaca || form.motoristaPlacaLegacy || form.motoristaPlaca,
-        veiculoId: form.veiculoId || null,
-        veiculoNome: form.veiculoNome || null,
-        veiculoPlaca: form.veiculoPlaca || null,
-        clienteId: form.clienteId,
-        clienteNome: form.clienteNome,
-        notas,
-        cidadeDestino: form.cidadeDestino,
-        observacoes: form.observacoes,
-        status: 'agendada',
-        criadoEm: serverTimestamp(),
-        saidaEm: null,
-        entregaEm: null,
-        localizacaoAtual: null,
-      });
+      await addDoc(collection(db, 'viagens'), buildNovaViagemPayload(form, serverTimestamp()));
       toast.success('Viagem lançada com sucesso!');
       setForm(EMPTY_FORM);
       setShowModal(false);
@@ -186,20 +156,6 @@ export default function Viagens() {
     return format(d, "dd/MM/yy HH:mm", { locale: ptBR });
   };
 
-  const getComprovanteDaViagem = (viagem) => (
-    viagem?.status === 'entregue' && getFotoUrl(viagem) ? {
-      viagemId: viagem.id,
-      id: `viagem-${viagem.id}`,
-      fotoUrl: getFotoUrl(viagem),
-      status: viagem.comprovanteStatus || 'pendente',
-      latitude: viagem.comprovanteLatitude ?? null,
-      longitude: viagem.comprovanteLongitude ?? null,
-      enviadoEm: viagem.comprovanteEnviadoEm || viagem.entregaEm || null,
-      motoristaNome: viagem.comprovanteMotoristaNome || viagem.motoristaNome,
-      source: 'viagem',
-    } : null
-  );
-
   const getComprovanteEfetivo = (viagem) => getComprovanteDaViagem(viagem) || comprovanteDetalhes;
 
   const confirmarComprovante = async (viagem) => {
@@ -214,21 +170,7 @@ export default function Viagens() {
     toast.success('Comprovante confirmado');
   };
 
-  const viagensFiltradas = filtro === 'todos'
-    ? viagens
-    : viagens.filter(v => v.status === filtro);
-
-  const viagensFiltradasPorNota = viagensFiltradas.filter((viagem) => {
-    if (!buscaNota.trim()) return true;
-    const termo = buscaNota.trim().toLowerCase();
-    return (viagem.notas || []).some((nota) => String(nota).toLowerCase().includes(termo));
-  });
-
-  const getResumoVeiculo = (viagem) => {
-    if (viagem.veiculoPlaca && viagem.veiculoNome) return `${viagem.veiculoPlaca} · ${viagem.veiculoNome}`;
-    if (viagem.veiculoPlaca) return viagem.veiculoPlaca;
-    return viagem.motoristaPlaca || '—';
-  };
+  const viagensFiltradasPorNota = filterViagensByStatusAndNota(viagens, filtro, buscaNota);
 
   return (
     <Layout title="Viagens">

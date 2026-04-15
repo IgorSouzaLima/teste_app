@@ -5,6 +5,10 @@ import { db } from '../lib/firebase';
 import MapaAoVivo from './MapaAoVivo';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import {
+  getComprovanteDaViagem,
+  normalizarComprovanteDaColecao,
+} from '../lib/viagemCliente';
 
 const statusLabel = {
   agendada: 'Agendada',
@@ -17,26 +21,6 @@ const statusBadge = {
   em_rota: 'badge-info',
   entregue: 'badge-success',
   cancelada: 'badge badge-warning',
-};
-
-const getFotoUrl = (item) => item?.fotoUrl || item?.comprovanteFotoUrl || item?.secure_url || item?.url || null;
-
-const normalizarComprovanteDaColecao = (viagem, item) => {
-  const fotoUrl = getFotoUrl(item);
-  if (!fotoUrl) return null;
-
-  return {
-    id: item.id,
-    viagemId: item.viagemId || viagem.id,
-    clienteNome: item.clienteNome || viagem.clienteNome,
-    motoristaNome: item.motoristaNome || item.comprovanteMotoristaNome || viagem.motoristaNome,
-    notas: item.notas || viagem.notas || [],
-    latitude: item.latitude ?? item.comprovanteLatitude ?? null,
-    longitude: item.longitude ?? item.comprovanteLongitude ?? null,
-    criadoEm: item.criadoEm || item.enviadoEm || item.comprovanteEnviadoEm || null,
-    status: item.status || item.comprovanteStatus || 'pendente',
-    fotoUrl,
-  };
 };
 
 export default function CardViagem({ viagemId, defaultAberto = false }) {
@@ -88,20 +72,7 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
 
   if (!viagem) return null;
 
-  const comprovanteDaViagem = viagem.status === 'entregue' && getFotoUrl(viagem) ? {
-    id: `viagem-${viagem.id}`,
-    viagemId: viagem.id,
-    clienteNome: viagem.clienteNome,
-    motoristaNome: viagem.comprovanteMotoristaNome || viagem.motoristaNome,
-    notas: viagem.notas,
-    latitude: viagem.comprovanteLatitude ?? null,
-    longitude: viagem.comprovanteLongitude ?? null,
-    criadoEm: viagem.comprovanteEnviadoEm || viagem.entregaEm || null,
-    status: viagem.comprovanteStatus || 'pendente',
-    fotoUrl: getFotoUrl(viagem),
-  } : null;
-
-  const comprovanteEfetivo = comprovanteDaViagem || comprovanteColecao;
+  const comprovanteEfetivo = getComprovanteDaViagem(viagem) || comprovanteColecao;
 
   const isEmRota = viagem.status === 'em_rota';
   const isEntregue = viagem.status === 'entregue';

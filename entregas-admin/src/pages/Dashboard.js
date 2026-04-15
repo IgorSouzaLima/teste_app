@@ -6,6 +6,7 @@ import Layout from '../components/Layout';
 import MapaViagem from '../components/MapaViagem';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { filterViagensByStatusAndNota } from '../lib/viagemView';
 
 const statusLabel = { agendada: 'Agendada', em_rota: 'Em rota', entregue: 'Entregue', cancelada: 'Cancelada' };
 const statusBadge = { agendada: 'badge-gray', em_rota: 'badge-info', entregue: 'badge-success', cancelada: 'badge-danger' };
@@ -43,14 +44,7 @@ export default function Dashboard() {
     return format(d, "dd/MM HH:mm", { locale: ptBR });
   };
 
-  const viagensFiltradas = viagens.filter((viagem) => {
-    if (statusFiltro !== 'todos' && viagem.status !== statusFiltro) {
-      return false;
-    }
-    if (!buscaNota.trim()) return true;
-    const termo = buscaNota.trim().toLowerCase();
-    return (viagem.notas || []).some((nota) => String(nota).toLowerCase().includes(termo));
-  });
+  const viagensFiltradas = filterViagensByStatusAndNota(viagens, statusFiltro, buscaNota);
 
   const cardStyle = (ativo) => ({
     cursor: 'pointer',
