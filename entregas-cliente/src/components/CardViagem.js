@@ -108,14 +108,11 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
   const comprovanteEnviado = !!comprovanteEfetivo;
 
   return (
-    <div className="card" style={{ marginBottom: 14 }}>
+    <div className="card trip-card" style={{ marginBottom: 14 }}>
 
       {/* Cabeçalho do card */}
-      <div
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: 'pointer' }}
-        onClick={() => setAberto(a => !a)}
-      >
-        <div style={{ flex: 1 }}>
+      <div className="trip-card-head" onClick={() => setAberto(a => !a)}>
+        <div className="trip-card-heading">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
             <span className={`badge ${statusBadge[viagem.status]}`}>
               {isEmRota && <span className="live-dot" />}
@@ -123,20 +120,18 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
             </span>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{fmtData(viagem.criadoEm)}</span>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
-            {viagem.cidadeDestino}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
+          <div className="trip-card-city">{viagem.cidadeDestino}</div>
+          <div className="trip-card-meta">
             Motorista: {viagem.motoristaNome} · {viagem.motoristaPlaca}
           </div>
         </div>
-        <span style={{ fontSize: 18, color: 'var(--text-3)', marginLeft: 8, userSelect: 'none' }}>
+        <span className="trip-card-toggle">
           {aberto ? '▲' : '▼'}
         </span>
       </div>
 
       {/* Notas fiscais — sempre visíveis */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 8 }}>
+      <div className="trip-notes">
         {(viagem.notas || []).map(n => (
           <span key={n} className="nota-tag">{n}</span>
         ))}
@@ -184,9 +179,7 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
 
           {/* Timeline de status */}
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Progresso
-            </div>
+            <div className="trip-section-title">Progresso</div>
             <div className="timeline">
               <div className="tl-item">
                 <div className="tl-dot tl-dot-done" />
@@ -243,7 +236,7 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
           {comprovanteEfetivo && (
             <div style={{ marginTop: 16 }}>
               <div className="card-title">Comprovante de entrega</div>
-              <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 8 }}>
+              <div className="trip-proof-summary">
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--success)' }}>
                   Entrega confirmada pelo motorista
                 </div>
@@ -270,10 +263,8 @@ export default function CardViagem({ viagemId, defaultAberto = false }) {
 
           {/* Observações */}
           {viagem.observacoes && (
-            <div style={{ marginTop: 14, background: 'var(--bg)', borderRadius: 8, padding: '10px 12px' }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>
-                Observações
-              </div>
+            <div className="trip-note-panel">
+              <div className="trip-section-title" style={{ marginBottom: 4 }}>Observações</div>
               <div style={{ fontSize: 13, color: 'var(--text)' }}>{viagem.observacoes}</div>
             </div>
           )}

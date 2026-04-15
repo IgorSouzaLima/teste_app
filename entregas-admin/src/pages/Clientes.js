@@ -68,7 +68,11 @@ export default function Clientes() {
 
   return (
     <Layout title="Clientes">
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+      <div className="page-toolbar">
+        <div>
+          <div className="card-title" style={{ marginBottom: 4 }}>Base de clientes</div>
+          <div className="card-subtitle">Cadastre empresas atendidas, contatos e acessos do portal do cliente.</div>
+        </div>
         <button className="btn btn-primary" onClick={abrirNovo}>
           <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Novo cliente

@@ -232,8 +232,12 @@ export default function Viagens() {
 
   return (
     <Layout title="Viagens">
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 6 }}>
+      <div className="page-toolbar">
+        <div>
+          <div className="card-title" style={{ marginBottom: 4 }}>Central de viagens</div>
+          <div className="card-subtitle">Filtre a operação, acompanhe status e lance novas cargas com motorista e veículo separados.</div>
+        </div>
+        <div className="toolbar-group">
           {['todos', 'agendada', 'em_rota', 'entregue', 'cancelada'].map(f => (
             <button key={f}
               className={`btn btn-sm ${filtro === f ? 'btn-primary' : ''}`}
@@ -242,7 +246,7 @@ export default function Viagens() {
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="toolbar-actions">
           <input
             className="form-input"
             value={buscaNota}

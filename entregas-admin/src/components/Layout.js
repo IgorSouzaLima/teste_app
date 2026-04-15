@@ -15,6 +15,20 @@ export default function Layout({ children, title }) {
   const { logout, userData } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const sectionDescription = {
+    Dashboard: 'Visão geral da operação, filtros rápidos e rastreamento ativo.',
+    Viagens: 'Lance, acompanhe e finalize as cargas com contexto completo.',
+    Motoristas: 'Gerencie cadastro, acesso e compatibilidade dos perfis ativos.',
+    Veículos: 'Organize a frota disponível para uso nas próximas viagens.',
+    Clientes: 'Controle acessos, contatos e empresas atendidas pelo sistema.',
+  };
+  const userLabel = userData?.nome || userData?.email || 'Administrador';
+  const userInitials = userLabel
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'AD';
 
   const handleLogout = async () => {
     await logout();
@@ -48,8 +62,19 @@ export default function Layout({ children, title }) {
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <h1>Entregas</h1>
-          <p>Painel administrativo</p>
+          <div className="sidebar-logo-row">
+            <div className="sidebar-mark">
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M1 3h15l4 5v13H1z" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="5.5" cy="17.5" r="2.5"/>
+                <circle cx="16.5" cy="17.5" r="2.5"/>
+              </svg>
+            </div>
+            <div>
+              <h1>Entregas</h1>
+              <p>Painel administrativo</p>
+            </div>
+          </div>
         </div>
         <nav className="sidebar-nav">
           {nav.map(item => (
@@ -64,8 +89,9 @@ export default function Layout({ children, title }) {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8, paddingLeft: 4 }}>
-            {userData?.nome || userData?.email}
+          <div className="sidebar-user">
+            <div className="sidebar-user-label">Sessão ativa</div>
+            <div className="sidebar-user-name">{userLabel}</div>
           </div>
           <button className="nav-link" onClick={handleLogout}>
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -77,9 +103,24 @@ export default function Layout({ children, title }) {
       </aside>
       <div className="main">
         <header className="topbar">
-          <h2>{title}</h2>
+          <div className="topbar-copy">
+            <span className="topbar-eyebrow">Operação</span>
+            <h2>{title}</h2>
+            <p className="topbar-subtitle">{sectionDescription[title] || 'Acompanhe a central de entregas com clareza e contexto.'}</p>
+          </div>
+          <div className="topbar-meta">
+            <div className="topbar-user">
+              <span className="topbar-user-mark">{userInitials}</span>
+              <span>
+                <span className="topbar-user-label">Responsável</span>
+                <span className="topbar-user-value">{userLabel}</span>
+              </span>
+            </div>
+          </div>
         </header>
-        <main className="content">{children}</main>
+        <main className="content">
+          <div className="content-shell">{children}</div>
+        </main>
       </div>
     </div>
   );

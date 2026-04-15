@@ -68,15 +68,44 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="topbar">
-        <div>
-          <div className="topbar-title">Minhas entregas</div>
-          <div className="topbar-sub">{clienteData?.razaoSocial}</div>
+      <div className="topbar-shell">
+        <div className="topbar">
+          <div>
+            <div className="topbar-title">Minhas entregas</div>
+            <div className="topbar-sub">{clienteData?.razaoSocial}</div>
+          </div>
+          <button className="topbar-logout" onClick={logout}>Sair</button>
         </div>
-        <button className="topbar-logout" onClick={logout}>Sair</button>
       </div>
 
       <div className="page">
+        <div className="hero-strip">
+          <div className="hero-strip-head">
+            <div>
+              <div className="hero-strip-title">Acompanhamento em tempo real</div>
+              <div className="hero-strip-sub">
+                Consulte suas cargas em andamento, acompanhe o histórico e encontre notas fiscais com rapidez.
+              </div>
+            </div>
+            <div className="badge badge-info">
+              {emRota.length > 0 ? `${emRota.length} em rota agora` : 'Sem rota ativa agora'}
+            </div>
+          </div>
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <strong>{ativas.length}</strong>
+              <span>Entregas em andamento</span>
+            </div>
+            <div className="hero-stat">
+              <strong>{historico.length}</strong>
+              <span>Entregas no histórico</span>
+            </div>
+            <div className="hero-stat">
+              <strong>{viagens.length}</strong>
+              <span>Total de viagens vinculadas</span>
+            </div>
+          </div>
+        </div>
 
         {/* Banner de entrega em rota */}
         {emRota.length > 0 && (
@@ -115,13 +144,12 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div style={{ marginBottom: 14 }}>
+        <div className="search-row">
           <input
             className="form-input"
             value={buscaNota}
             onChange={(e) => setBuscaNota(e.target.value)}
             placeholder="Buscar por número da nota"
-            style={{ maxWidth: 280 }}
           />
         </div>
 

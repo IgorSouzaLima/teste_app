@@ -1,6 +1,6 @@
 // src/pages/Dashboard.js
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Layout from '../components/Layout';
 import MapaViagem from '../components/MapaViagem';
@@ -18,9 +18,6 @@ export default function Dashboard() {
   const [buscaNota, setBuscaNota] = useState('');
 
   useEffect(() => {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
     const q = query(
       collection(db, 'viagens'),
       orderBy('criadoEm', 'desc'),
@@ -96,7 +93,10 @@ export default function Dashboard() {
 
       <div className="card" style={{ marginBottom: 0 }}>
         <div className="card-header">
-          <span className="card-title">Viagens recentes</span>
+          <div>
+            <div className="card-title">Viagens recentes</div>
+            <div className="card-subtitle">Consulte as últimas cargas lançadas e filtre rapidamente por nota e status.</div>
+          </div>
           <input
             className="form-input"
             value={buscaNota}
