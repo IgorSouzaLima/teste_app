@@ -51,6 +51,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Veículos ────────────────────────────────────────────────
+    match /veiculos/{veiculoId} {
+      allow read, write: if isAdmin();
+    }
+
     // ── Viagens ─────────────────────────────────────────────────
     match /viagens/{viagemId} {
       allow read: if isAdmin() ||

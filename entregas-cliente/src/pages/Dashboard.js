@@ -13,6 +13,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [aba, setAba] = useState('ativas');
+  const [buscaNota, setBuscaNota] = useState('');
 
   useEffect(() => {
     if (!clienteData?.id) {
@@ -58,7 +59,12 @@ export default function Dashboard() {
   const historico = viagens.filter(v => v.status === 'entregue' || v.status === 'cancelada');
   const emRota = viagens.filter(v => v.status === 'em_rota');
 
-  const lista = aba === 'ativas' ? ativas : historico;
+  const listaBase = aba === 'ativas' ? ativas : historico;
+  const lista = listaBase.filter((viagem) => {
+    if (!buscaNota.trim()) return true;
+    const termo = buscaNota.trim().toLowerCase();
+    return (viagem.notas || []).some((nota) => String(nota).toLowerCase().includes(termo));
+  });
 
   return (
     <>
@@ -107,6 +113,16 @@ export default function Dashboard() {
           >
             Histórico {historico.length > 0 && `(${historico.length})`}
           </button>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <input
+            className="form-input"
+            value={buscaNota}
+            onChange={(e) => setBuscaNota(e.target.value)}
+            placeholder="Buscar por número da nota"
+            style={{ maxWidth: 280 }}
+          />
         </div>
 
         {/* Loading */}

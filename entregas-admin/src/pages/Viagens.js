@@ -17,6 +17,8 @@ const comprovanteBadge = { pendente: 'badge-warning', confirmado: 'badge-success
 
 const EMPTY_FORM = {
   motoristaId: '', motoristaNome: '', motoristaPlaca: '',
+  motoristaPlacaLegacy: '',
+  veiculoId: '', veiculoNome: '', veiculoPlaca: '',
   clienteId: '', clienteNome: '',
   notasRaw: '', cidadeDestino: '', observacoes: ''
 };
@@ -43,6 +45,7 @@ const normalizarComprovanteDaColecao = (viagem, item) => {
 export default function Viagens() {
   const [viagens, setViagens] = useState([]);
   const [motoristas, setMotoristas] = useState([]);
+  const [veiculos, setVeiculos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showDetalhes, setShowDetalhes] = useState(null);
@@ -50,6 +53,7 @@ export default function Viagens() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [filtro, setFiltro] = useState('todos');
+  const [buscaNota, setBuscaNota] = useState('');
 
   useEffect(() => {
     const q = query(collection(db, 'viagens'), orderBy('criadoEm', 'desc'));
@@ -59,6 +63,10 @@ export default function Viagens() {
 
     getDocs(collection(db, 'motoristas')).then(snap => {
       setMotoristas(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.ativo));
+    });
+
+    getDocs(collection(db, 'veiculos')).then(snap => {
+      setVeiculos(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.ativo));
     });
 
     getDocs(collection(db, 'clientes')).then(snap => {
@@ -105,7 +113,24 @@ export default function Viagens() {
 
   const handleMotoristaChange = (id) => {
     const m = motoristas.find(x => x.id === id);
-    setForm(f => ({ ...f, motoristaId: id, motoristaNome: m?.nome || '', motoristaPlaca: m?.placa || '' }));
+    setForm((current) => ({
+      ...current,
+      motoristaId: id,
+      motoristaNome: m?.nome || '',
+      motoristaPlacaLegacy: m?.placa || '',
+      motoristaPlaca: current.veiculoPlaca || m?.placa || '',
+    }));
+  };
+
+  const handleVeiculoChange = (id) => {
+    const veiculo = veiculos.find((item) => item.id === id);
+    setForm((current) => ({
+      ...current,
+      veiculoId: id,
+      veiculoNome: veiculo?.descricao || '',
+      veiculoPlaca: veiculo?.placa || '',
+      motoristaPlaca: veiculo?.placa || current.motoristaPlacaLegacy || '',
+    }));
   };
 
   const handleClienteChange = (id) => {
@@ -124,7 +149,10 @@ export default function Viagens() {
       await addDoc(collection(db, 'viagens'), {
         motoristaId: form.motoristaId,
         motoristaNome: form.motoristaNome,
-        motoristaPlaca: form.motoristaPlaca,
+        motoristaPlaca: form.veiculoPlaca || form.motoristaPlacaLegacy || form.motoristaPlaca,
+        veiculoId: form.veiculoId || null,
+        veiculoNome: form.veiculoNome || null,
+        veiculoPlaca: form.veiculoPlaca || null,
         clienteId: form.clienteId,
         clienteNome: form.clienteNome,
         notas,
@@ -190,6 +218,18 @@ export default function Viagens() {
     ? viagens
     : viagens.filter(v => v.status === filtro);
 
+  const viagensFiltradasPorNota = viagensFiltradas.filter((viagem) => {
+    if (!buscaNota.trim()) return true;
+    const termo = buscaNota.trim().toLowerCase();
+    return (viagem.notas || []).some((nota) => String(nota).toLowerCase().includes(termo));
+  });
+
+  const getResumoVeiculo = (viagem) => {
+    if (viagem.veiculoPlaca && viagem.veiculoNome) return `${viagem.veiculoPlaca} · ${viagem.veiculoNome}`;
+    if (viagem.veiculoPlaca) return viagem.veiculoPlaca;
+    return viagem.motoristaPlaca || '—';
+  };
+
   return (
     <Layout title="Viagens">
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', justifyContent: 'space-between' }}>
@@ -202,10 +242,19 @@ export default function Viagens() {
             </button>
           ))}
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nova viagem
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            className="form-input"
+            value={buscaNota}
+            onChange={(e) => setBuscaNota(e.target.value)}
+            placeholder="Buscar por número da nota"
+            style={{ minWidth: 220 }}
+          />
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova viagem
+          </button>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 0 }}>
@@ -225,16 +274,16 @@ export default function Viagens() {
               </tr>
             </thead>
             <tbody>
-              {viagensFiltradas.length === 0 && (
+              {viagensFiltradasPorNota.length === 0 && (
                 <tr><td colSpan={9} style={{ textAlign: 'center', padding: 40, color: 'var(--text-2)' }}>
                   Nenhuma viagem encontrada
                 </td></tr>
               )}
-              {viagensFiltradas.map(v => (
+              {viagensFiltradasPorNota.map(v => (
                 <tr key={v.id}>
                   <td>
                     <div style={{ fontWeight: 500 }}>{v.motoristaNome}</div>
-                    <div className="text-sm text-muted">{v.motoristaPlaca}</div>
+                    <div className="text-sm text-muted">{getResumoVeiculo(v)}</div>
                   </td>
                   <td>{v.clienteNome}</td>
                   <td>
@@ -283,14 +332,32 @@ export default function Viagens() {
                     onChange={e => handleMotoristaChange(e.target.value)}>
                     <option value="">Selecione...</option>
                     {motoristas.map(m => (
-                      <option key={m.id} value={m.id}>{m.nome} — {m.placa}</option>
+                      <option key={m.id} value={m.id}>{m.nome}{m.placa ? ` — ${m.placa}` : ''}</option>
                     ))}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Placa (auto)</label>
+                  <label className="form-label">Veículo</label>
+                  <select className="form-select" value={form.veiculoId}
+                    onChange={e => handleVeiculoChange(e.target.value)}>
+                    <option value="">Selecionar depois / usar legado</option>
+                    {veiculos.map(v => (
+                      <option key={v.id} value={v.id}>{v.placa} — {v.descricao}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Placa usada na viagem</label>
                   <input className="form-input" value={form.motoristaPlaca} readOnly
-                    placeholder="Selecionado ao escolher motorista" style={{ background: 'var(--bg)' }} />
+                    placeholder="Definida ao escolher veículo ou motorista legado" style={{ background: 'var(--bg)' }} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Descrição do veículo</label>
+                  <input className="form-input" value={form.veiculoNome} readOnly
+                    placeholder="Selecionado ao escolher veículo" style={{ background: 'var(--bg)' }} />
                 </div>
               </div>
 
@@ -362,7 +429,7 @@ export default function Viagens() {
                 <div>
                   <div className="text-muted text-sm">Motorista</div>
                   <div style={{ fontWeight: 500 }}>{showDetalhes.motoristaNome}</div>
-                  <div className="text-muted text-sm">{showDetalhes.motoristaPlaca}</div>
+                  <div className="text-muted text-sm">{getResumoVeiculo(showDetalhes)}</div>
                 </div>
                 <div>
                   <div className="text-muted text-sm">Status</div>

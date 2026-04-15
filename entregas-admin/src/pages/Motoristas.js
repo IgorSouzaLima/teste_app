@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   collection, addDoc, onSnapshot, orderBy, query,
-  serverTimestamp, doc, updateDoc, deleteDoc, getDocs
+  serverTimestamp, doc, updateDoc
 } from 'firebase/firestore';
 import { createAuthUserWithSecondaryApp } from '../lib/createAuthUser';
 import { db, firebaseConfig } from '../lib/firebase';
@@ -35,7 +35,7 @@ export default function Motoristas() {
   };
 
   const handleSalvar = async () => {
-    if (!form.nome || !form.placa) { toast.error('Nome e placa são obrigatórios'); return; }
+    if (!form.nome) { toast.error('Nome é obrigatório'); return; }
     setSaving(true);
     try {
       if (editando) {
@@ -151,13 +151,20 @@ export default function Motoristas() {
                   <input className="form-input" value={form.cnh} onChange={e => setF('cnh', e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Placa do veículo *</label>
+                  <label className="form-label">Placa legada / opcional</label>
                   <input className="form-input" value={form.placa} onChange={e => setF('placa', e.target.value.toUpperCase())} placeholder="ABC-1234" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Veículo</label>
+                  <label className="form-label">Veículo legado / opcional</label>
                   <input className="form-input" value={form.veiculo} onChange={e => setF('veiculo', e.target.value)} placeholder="Fiat Toro 2022" />
                 </div>
+              </div>
+              <div style={{
+                background: 'var(--bg)', borderRadius: 8, padding: '10px 12px',
+                fontSize: 12, color: 'var(--text-2)', marginTop: 4
+              }}>
+                Para novos cadastros, o ideal agora é vincular o veículo no lançamento da viagem.
+                Estes campos continuam aqui só para compatibilidade com os motoristas antigos.
               </div>
               {!editando && (
                 <>

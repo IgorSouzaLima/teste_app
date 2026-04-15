@@ -14,6 +14,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ total: 0, agendadas: 0, em_rota: 0, entregues: 0 });
   const [viagens, setViagens] = useState([]);
   const [viagemSelecionada, setViagemSelecionada] = useState(null);
+  const [statusFiltro, setStatusFiltro] = useState('todos');
+  const [buscaNota, setBuscaNota] = useState('');
 
   useEffect(() => {
     const hoje = new Date();
@@ -44,22 +46,37 @@ export default function Dashboard() {
     return format(d, "dd/MM HH:mm", { locale: ptBR });
   };
 
+  const viagensFiltradas = viagens.filter((viagem) => {
+    if (statusFiltro !== 'todos' && viagem.status !== statusFiltro) {
+      return false;
+    }
+    if (!buscaNota.trim()) return true;
+    const termo = buscaNota.trim().toLowerCase();
+    return (viagem.notas || []).some((nota) => String(nota).toLowerCase().includes(termo));
+  });
+
+  const cardStyle = (ativo) => ({
+    cursor: 'pointer',
+    border: ativo ? '1px solid var(--primary)' : '1px solid transparent',
+    boxShadow: ativo ? '0 0 0 2px var(--primary-bg)' : undefined,
+  });
+
   return (
     <Layout title="Dashboard">
       <div className="stats-grid">
-        <div className="stat-card">
+        <div className="stat-card" style={cardStyle(statusFiltro === 'todos')} onClick={() => setStatusFiltro('todos')}>
           <div className="stat-value">{stats.total}</div>
           <div className="stat-label">Total de viagens</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card" style={cardStyle(statusFiltro === 'agendada')} onClick={() => setStatusFiltro('agendada')}>
           <div className="stat-value" style={{ color: 'var(--text-2)' }}>{stats.agendadas}</div>
           <div className="stat-label">Agendadas</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card" style={cardStyle(statusFiltro === 'em_rota')} onClick={() => setStatusFiltro('em_rota')}>
           <div className="stat-value" style={{ color: 'var(--primary)' }}>{stats.em_rota}</div>
           <div className="stat-label">Em rota agora</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card" style={cardStyle(statusFiltro === 'entregue')} onClick={() => setStatusFiltro('entregue')}>
           <div className="stat-value" style={{ color: 'var(--success)' }}>{stats.entregues}</div>
           <div className="stat-label">Entregues</div>
         </div>
@@ -80,6 +97,13 @@ export default function Dashboard() {
       <div className="card" style={{ marginBottom: 0 }}>
         <div className="card-header">
           <span className="card-title">Viagens recentes</span>
+          <input
+            className="form-input"
+            value={buscaNota}
+            onChange={(e) => setBuscaNota(e.target.value)}
+            placeholder="Buscar por número da nota"
+            style={{ maxWidth: 240 }}
+          />
         </div>
         <div className="table-wrap">
           <table>
@@ -95,12 +119,12 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {viagens.length === 0 && (
+              {viagensFiltradas.length === 0 && (
                 <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-2)', padding: 32 }}>
                   Nenhuma viagem cadastrada ainda
                 </td></tr>
               )}
-              {viagens.map(v => (
+              {viagensFiltradas.map(v => (
                 <tr key={v.id}>
                   <td>
                     <div style={{ fontWeight: 500 }}>{v.motoristaNome}</div>
