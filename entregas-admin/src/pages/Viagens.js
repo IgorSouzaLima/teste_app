@@ -10,6 +10,8 @@ import MapaViagem from '../components/MapaViagem';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useAuth } from '../lib/AuthContext';
+import { registrarAuditoria } from '../lib/auditoria';
 import {
   buildNovaViagemPayload,
   filterViagensByStatusAndNota,
@@ -31,6 +33,7 @@ const EMPTY_FORM = {
 };
 
 export default function Viagens() {
+  const { user, userData } = useAuth();
   const [viagens, setViagens] = useState([]);
   const [motoristas, setMotoristas] = useState([]);
   const [veiculos, setVeiculos] = useState([]);
@@ -133,7 +136,20 @@ export default function Viagens() {
     }
     setSaving(true);
     try {
-      await addDoc(collection(db, 'viagens'), buildNovaViagemPayload(form, serverTimestamp()));
+      const payload = buildNovaViagemPayload(form, serverTimestamp());
+      const ref = await addDoc(collection(db, 'viagens'), payload);
+      await registrarAuditoria({
+        ator: { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email },
+        acao: 'viagem.criada',
+        entidade: 'viagem',
+        entidadeId: ref.id,
+        descricao: `Viagem lançada para ${form.clienteNome} com destino em ${form.cidadeDestino}.`,
+        meta: {
+          motorista: form.motoristaNome,
+          veiculo: form.veiculoPlaca || form.motoristaPlacaLegacy || '—',
+          notas: payload.notas.join(', '),
+        },
+      });
       toast.success('Viagem lançada com sucesso!');
       setForm(EMPTY_FORM);
       setShowModal(false);
@@ -146,7 +162,19 @@ export default function Viagens() {
 
   const cancelarViagem = async (id) => {
     if (!window.confirm('Cancelar esta viagem?')) return;
+    const viagem = viagens.find((item) => item.id === id);
     await updateDoc(doc(db, 'viagens', id), { status: 'cancelada' });
+    await registrarAuditoria({
+      ator: { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email },
+      acao: 'viagem.cancelada',
+      entidade: 'viagem',
+      entidadeId: id,
+      descricao: `Viagem para ${viagem?.clienteNome || 'cliente'} foi cancelada.`,
+      meta: {
+        destino: viagem?.cidadeDestino || '—',
+        notas: (viagem?.notas || []).join(', ') || '—',
+      },
+    });
     toast.success('Viagem cancelada');
   };
 
@@ -166,6 +194,17 @@ export default function Viagens() {
 
     const relacionados = await getDocs(query(collection(db, 'comprovantes'), where('viagemId', '==', viagem.id)));
     await Promise.all(relacionados.docs.map((snap) => updateDoc(doc(db, 'comprovantes', snap.id), { status: 'confirmado' })));
+    await registrarAuditoria({
+      ator: { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email },
+      acao: 'comprovante.confirmado',
+      entidade: 'viagem',
+      entidadeId: viagem.id,
+      descricao: `Comprovante da viagem para ${viagem.clienteNome} foi confirmado.`,
+      meta: {
+        motorista: viagem.motoristaNome,
+        destino: viagem.cidadeDestino,
+      },
+    });
 
     toast.success('Comprovante confirmado');
   };

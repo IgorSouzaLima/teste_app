@@ -36,6 +36,7 @@ npm run build
    - lançar uma viagem nova
    - filtrar por status
    - buscar por número de nota
+   - abrir `Auditoria` e conferir se a ação foi registrada
    - abrir `Ações` e conferir comprovante em viagem entregue
 2. Cliente:
    - entrar com usuário cliente
@@ -46,6 +47,18 @@ npm run build
    - iniciar uma viagem
    - confirmar se o admin recebe localização
    - concluir entrega e enviar comprovante
+
+### Auditoria operacional
+
+O painel admin agora pode registrar ações importantes na coleção `auditoria`, como:
+- criação e atualização de clientes
+- criação e atualização de motoristas
+- criação e atualização de veículos
+- criação, cancelamento e confirmação de comprovante em viagens
+
+Para visualizar:
+- entre no admin
+- abra a seção `Auditoria`
 
 ---
 

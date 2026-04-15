@@ -8,10 +8,13 @@ import { createAuthUserWithSecondaryApp } from '../lib/createAuthUser';
 import { db, firebaseConfig } from '../lib/firebase';
 import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
+import { useAuth } from '../lib/AuthContext';
+import { registrarAuditoria } from '../lib/auditoria';
 
 const EMPTY = { nome: '', cpf: '', telefone: '', placa: '', veiculo: '', cnh: '', email: '', senha: '' };
 
 export default function Motoristas() {
+  const { user, userData } = useAuth();
   const [motoristas, setMotoristas] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -38,9 +41,18 @@ export default function Motoristas() {
     if (!form.nome) { toast.error('Nome é obrigatório'); return; }
     setSaving(true);
     try {
+      const ator = { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email };
       if (editando) {
         const { senha, email, ...data } = form;
         await updateDoc(doc(db, 'motoristas', editando), { ...data });
+        await registrarAuditoria({
+          ator,
+          acao: 'motorista.atualizado',
+          entidade: 'motorista',
+          entidadeId: editando,
+          descricao: `Motorista ${form.nome} atualizado no painel.`,
+          meta: { telefone: form.telefone || '—', cnh: form.cnh || '—' },
+        });
         toast.success('Motorista atualizado!');
       } else {
         if (!form.email || !form.senha) { toast.error('E-mail e senha necessários para novo motorista'); setSaving(false); return; }
@@ -56,6 +68,14 @@ export default function Motoristas() {
           uid: userId, email: form.email, nome: form.nome,
           role: 'motorista', motoristaId: motRef.id, criadoEm: serverTimestamp(), ativo: true,
         });
+        await registrarAuditoria({
+          ator,
+          acao: 'motorista.criado',
+          entidade: 'motorista',
+          entidadeId: motRef.id,
+          descricao: `Motorista ${form.nome} cadastrado com acesso ao aplicativo.`,
+          meta: { email: form.email, telefone: form.telefone || '—' },
+        });
         toast.success('Motorista cadastrado e conta criada!');
       }
       setShowModal(false);
@@ -68,6 +88,14 @@ export default function Motoristas() {
 
   const toggleAtivo = async (m) => {
     await updateDoc(doc(db, 'motoristas', m.id), { ativo: !m.ativo });
+    await registrarAuditoria({
+      ator: { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email },
+      acao: m.ativo ? 'motorista.desativado' : 'motorista.ativado',
+      entidade: 'motorista',
+      entidadeId: m.id,
+      descricao: `Motorista ${m.nome} foi ${m.ativo ? 'desativado' : 'ativado'}.`,
+      meta: { telefone: m.telefone || '—', placaLegada: m.placa || '—' },
+    });
     toast.success(m.ativo ? 'Motorista desativado' : 'Motorista reativado');
   };
 

@@ -9,6 +9,7 @@ import Viagens from './pages/Viagens';
 import Motoristas from './pages/Motoristas';
 import Veiculos from './pages/Veiculos';
 import Clientes from './pages/Clientes';
+import Auditoria from './pages/Auditoria';
 import './styles/global.css';
 
 function PrivateRoute({ children }) {
@@ -27,6 +28,7 @@ function AppRoutes() {
       <Route path="/motoristas" element={<PrivateRoute><Motoristas /></PrivateRoute>} />
       <Route path="/veiculos" element={<PrivateRoute><Veiculos /></PrivateRoute>} />
       <Route path="/clientes" element={<PrivateRoute><Clientes /></PrivateRoute>} />
+      <Route path="/auditoria" element={<PrivateRoute><Auditoria /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

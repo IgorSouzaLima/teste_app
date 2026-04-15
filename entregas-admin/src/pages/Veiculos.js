@@ -6,10 +6,13 @@ import {
 import { db } from '../lib/firebase';
 import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
+import { useAuth } from '../lib/AuthContext';
+import { registrarAuditoria } from '../lib/auditoria';
 
 const EMPTY = { placa: '', descricao: '', tipo: '', observacoes: '' };
 
 export default function Veiculos() {
+  const { user, userData } = useAuth();
   const [veiculos, setVeiculos] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -48,6 +51,7 @@ export default function Veiculos() {
 
     setSaving(true);
     try {
+      const ator = { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email };
       const data = {
         placa: form.placa.trim().toUpperCase(),
         descricao: form.descricao.trim(),
@@ -57,12 +61,28 @@ export default function Veiculos() {
 
       if (editando) {
         await updateDoc(doc(db, 'veiculos', editando), data);
+        await registrarAuditoria({
+          ator,
+          acao: 'veiculo.atualizado',
+          entidade: 'veiculo',
+          entidadeId: editando,
+          descricao: `Veículo ${data.placa} atualizado na frota.`,
+          meta: { descricao: data.descricao, tipo: data.tipo || '—' },
+        });
         toast.success('Veículo atualizado!');
       } else {
-        await addDoc(collection(db, 'veiculos'), {
+        const ref = await addDoc(collection(db, 'veiculos'), {
           ...data,
           ativo: true,
           criadoEm: serverTimestamp(),
+        });
+        await registrarAuditoria({
+          ator,
+          acao: 'veiculo.criado',
+          entidade: 'veiculo',
+          entidadeId: ref.id,
+          descricao: `Veículo ${data.placa} cadastrado na frota.`,
+          meta: { descricao: data.descricao, tipo: data.tipo || '—' },
         });
         toast.success('Veículo cadastrado!');
       }
@@ -79,6 +99,14 @@ export default function Veiculos() {
 
   const toggleAtivo = async (veiculo) => {
     await updateDoc(doc(db, 'veiculos', veiculo.id), { ativo: !veiculo.ativo });
+    await registrarAuditoria({
+      ator: { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email },
+      acao: veiculo.ativo ? 'veiculo.desativado' : 'veiculo.ativado',
+      entidade: 'veiculo',
+      entidadeId: veiculo.id,
+      descricao: `Veículo ${veiculo.placa} foi ${veiculo.ativo ? 'desativado' : 'ativado'}.`,
+      meta: { descricao: veiculo.descricao, tipo: veiculo.tipo || '—' },
+    });
     toast.success(veiculo.ativo ? 'Veículo desativado' : 'Veículo ativado');
   };
 

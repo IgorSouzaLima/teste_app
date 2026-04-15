@@ -8,10 +8,13 @@ import { createAuthUserWithSecondaryApp } from '../lib/createAuthUser';
 import { db, firebaseConfig } from '../lib/firebase';
 import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
+import { useAuth } from '../lib/AuthContext';
+import { registrarAuditoria } from '../lib/auditoria';
 
 const EMPTY = { razaoSocial: '', cnpj: '', contato: '', telefone: '', email: '', cidade: '', senha: '' };
 
 export default function Clientes() {
+  const { user, userData } = useAuth();
   const [clientes, setClientes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -33,9 +36,18 @@ export default function Clientes() {
     if (!form.razaoSocial || !form.email) { toast.error('Razão social e e-mail são obrigatórios'); return; }
     setSaving(true);
     try {
+      const ator = { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email };
       if (editando) {
         const { senha, ...data } = form;
         await updateDoc(doc(db, 'clientes', editando), data);
+        await registrarAuditoria({
+          ator,
+          acao: 'cliente.atualizado',
+          entidade: 'cliente',
+          entidadeId: editando,
+          descricao: `Cliente ${form.razaoSocial} atualizado no painel.`,
+          meta: { cidade: form.cidade || '—', email: form.email },
+        });
         toast.success('Cliente atualizado!');
       } else {
         if (!form.senha) { toast.error('Senha necessária para novo cliente'); setSaving(false); return; }
@@ -52,6 +64,14 @@ export default function Clientes() {
           role: 'cliente', clienteId: cliRef.id,
           criadoEm: serverTimestamp(), ativo: true,
         });
+        await registrarAuditoria({
+          ator,
+          acao: 'cliente.criado',
+          entidade: 'cliente',
+          entidadeId: cliRef.id,
+          descricao: `Cliente ${form.razaoSocial} cadastrado com acesso ao portal.`,
+          meta: { cidade: form.cidade || '—', email: form.email },
+        });
         toast.success('Cliente cadastrado!');
       }
       setShowModal(false);
@@ -64,6 +84,14 @@ export default function Clientes() {
 
   const toggleAtivo = async (c) => {
     await updateDoc(doc(db, 'clientes', c.id), { ativo: !c.ativo });
+    await registrarAuditoria({
+      ator: { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email },
+      acao: c.ativo ? 'cliente.desativado' : 'cliente.ativado',
+      entidade: 'cliente',
+      entidadeId: c.id,
+      descricao: `Cliente ${c.razaoSocial} foi ${c.ativo ? 'desativado' : 'ativado'}.`,
+      meta: { email: c.email, cidade: c.cidade || '—' },
+    });
   };
 
   return (

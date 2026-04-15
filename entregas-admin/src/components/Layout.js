@@ -21,6 +21,7 @@ export default function Layout({ children, title }) {
     Motoristas: 'Gerencie cadastro, acesso e compatibilidade dos perfis ativos.',
     Veículos: 'Organize a frota disponível para uso nas próximas viagens.',
     Clientes: 'Controle acessos, contatos e empresas atendidas pelo sistema.',
+    Auditoria: 'Acompanhe o histórico das ações administrativas registradas no sistema.',
   };
   const userLabel = userData?.nome || userData?.email || 'Administrador';
   const userInitials = userLabel
@@ -55,6 +56,10 @@ export default function Layout({ children, title }) {
     {
       to: '/clientes', label: 'Clientes',
       icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+    },
+    {
+      to: '/auditoria', label: 'Auditoria',
+      icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>
     },
   ];
 
