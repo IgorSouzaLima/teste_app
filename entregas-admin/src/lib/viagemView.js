@@ -81,6 +81,10 @@ export function filterViagensByStatusAndNota(viagens, status, termo) {
   return lista.filter((viagem) => matchesNota(viagem, termo));
 }
 
+export function canDeleteViagem(viagem) {
+  return viagem?.status === 'agendada' || viagem?.status === 'cancelada';
+}
+
 export function getResumoVeiculo(viagem) {
   if (viagem.veiculoPlaca && viagem.veiculoNome) return `${viagem.veiculoPlaca} · ${viagem.veiculoNome}`;
   if (viagem.veiculoPlaca) return viagem.veiculoPlaca;

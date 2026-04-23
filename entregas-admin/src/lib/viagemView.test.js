@@ -1,5 +1,6 @@
 import {
   buildNovaViagemPayload,
+  canDeleteViagem,
   filterViagensByStatusAndNota,
   getComprovanteDaViagem,
   getResumoVeiculo,
@@ -86,5 +87,13 @@ describe('viagemView', () => {
       status: 'em_rota',
       comprovanteFotoUrl: 'https://img.test/viagem.jpg',
     })).toBeNull();
+  });
+
+  test('permite apagar apenas viagens agendadas ou canceladas', () => {
+    expect(canDeleteViagem({ status: 'agendada' })).toBe(true);
+    expect(canDeleteViagem({ status: 'cancelada' })).toBe(true);
+    expect(canDeleteViagem({ status: 'em_rota' })).toBe(false);
+    expect(canDeleteViagem({ status: 'entregue' })).toBe(false);
+    expect(canDeleteViagem(null)).toBe(false);
   });
 });

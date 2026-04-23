@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   collection, addDoc, onSnapshot, orderBy, query,
-  serverTimestamp, doc, updateDoc, getDocs, where, limit
+  serverTimestamp, doc, updateDoc, getDocs, where, limit, writeBatch
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Layout from '../components/Layout';
@@ -11,10 +11,11 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../lib/AuthContext';
-import { registrarAuditoria } from '../lib/auditoria';
+import { buildAuditEntry, registrarAuditoria } from '../lib/auditoria';
 import { buildAlertasOperacionais, buildViagensCsv, filterViagensPorPainel } from '../lib/operacaoView';
 import {
   buildNovaViagemPayload,
+  canDeleteViagem,
   getComprovanteDaViagem,
   getResumoVeiculo,
   normalizarComprovanteDaColecao,
@@ -43,6 +44,7 @@ export default function Viagens() {
   const [comprovanteDetalhes, setComprovanteDetalhes] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [filtro, setFiltro] = useState('todos');
   const [buscaNota, setBuscaNota] = useState('');
   const [periodo, setPeriodo] = useState('all');
@@ -177,6 +179,62 @@ export default function Viagens() {
       },
     });
     toast.success('Viagem cancelada');
+  };
+
+  const apagarViagem = async (viagem) => {
+    if (!viagem?.id) return;
+    if (!canDeleteViagem(viagem)) {
+      toast.error('Apenas viagens agendadas ou canceladas podem ser apagadas.');
+      return;
+    }
+
+    const confirmado = window.confirm(
+      `Apagar permanentemente a viagem para ${viagem.clienteNome || 'cliente'}?\n\nEssa ação não pode ser desfeita.`
+    );
+    if (!confirmado) return;
+
+    setDeletingId(viagem.id);
+    try {
+      const [localizacoesSnap, comprovantesSnap] = await Promise.all([
+        getDocs(collection(db, 'viagens', viagem.id, 'localizacoes')),
+        getDocs(query(collection(db, 'comprovantes'), where('viagemId', '==', viagem.id))),
+      ]);
+
+      const batch = writeBatch(db);
+      const viagemRef = doc(db, 'viagens', viagem.id);
+      const auditoriaRef = doc(collection(db, 'auditoria'));
+
+      localizacoesSnap.forEach((snap) => batch.delete(snap.ref));
+      comprovantesSnap.forEach((snap) => batch.delete(snap.ref));
+      batch.delete(viagemRef);
+      batch.set(auditoriaRef, buildAuditEntry({
+        ator: { uid: user?.uid, nome: userData?.nome, email: userData?.email || user?.email },
+        acao: 'viagem.apagada',
+        entidade: 'viagem',
+        entidadeId: viagem.id,
+        descricao: `Viagem para ${viagem.clienteNome || 'cliente'} foi apagada do painel.`,
+        meta: {
+          status: viagem.status || '—',
+          destino: viagem.cidadeDestino || '—',
+          notas: (viagem.notas || []).join(', ') || '—',
+          comprovantesRemovidos: comprovantesSnap.size,
+          localizacoesRemovidas: localizacoesSnap.size,
+        },
+      }, serverTimestamp()));
+
+      await batch.commit();
+
+      if (showDetalhes?.id === viagem.id) {
+        setShowDetalhes(null);
+        setComprovanteDetalhes(null);
+      }
+
+      toast.success('Viagem apagada com sucesso');
+    } catch (err) {
+      toast.error('Erro ao apagar viagem: ' + err.message);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const fmtData = (ts) => {
@@ -332,6 +390,15 @@ export default function Viagens() {
                       <button className="btn btn-sm" onClick={() => setShowDetalhes(v)}>Ações</button>
                       {v.status === 'agendada' && (
                         <button className="btn btn-sm btn-danger" onClick={() => cancelarViagem(v.id)}>Cancelar</button>
+                      )}
+                      {canDeleteViagem(v) && (
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => apagarViagem(v)}
+                          disabled={deletingId === v.id}
+                        >
+                          {deletingId === v.id ? 'Apagando...' : 'Apagar'}
+                        </button>
                       )}
                     </div>
                   </td>
@@ -559,6 +626,15 @@ export default function Viagens() {
               })()}
             </div>
             <div className="modal-footer">
+              {canDeleteViagem(showDetalhes) && (
+                <button
+                  className="btn btn-danger"
+                  onClick={() => apagarViagem(showDetalhes)}
+                  disabled={deletingId === showDetalhes.id}
+                >
+                  {deletingId === showDetalhes.id ? 'Apagando...' : 'Apagar viagem'}
+                </button>
+              )}
               <button className="btn" onClick={() => setShowDetalhes(null)}>Fechar</button>
             </div>
           </div>
